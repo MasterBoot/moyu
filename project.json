@@ -1,0 +1,238 @@
+{
+	"contentrating" : "Everyone",
+		"description" : "摸鱼 (mō yú) literally means \"touching fish\" — which is exactly what this is:\r\na pond you can reach out and touch.\r\n\r\nA quiet koi pond for your desktop, with real daylight and small things that happen on their own.\r\n\r\nAn interactive koi pond (锦鲤池) that keeps moving while you do something else. Light, colour and falling petals follow your real time of day: bright at noon, warm at dusk, cool and dim at night. Move your cursor to ripple the water, click to feed the koi, and they scatter when you come too close.\r\n\r\n[h2]What makes it different[/h2]\r\n[list]\r\n[*] [b]Real daylight:[/b] the light direction, colour and brightness follow your actual clock, so the pond matches the time on your desktop.\r\n[*] [b]A pond that keeps happening:[/b] every minute or so a leaf or a petal drifts down by itself — it lands, ripples, startles the fish, and they gather to look at it.\r\n[*] [b]Weather on its own:[/b] clear, rain, heavy rain and snow rotate by themselves on a slow timer (you can pin one or turn the cycle off), with a slow transition, rain rings on the water and snow that melts where it lands.\r\n[*] [b]Interactive:[/b] cursor ripples, shy fish, click to feed.\r\n[/list]\r\n\r\n[h2]Settings[/h2]\r\n[list]\r\n[*] Light follows real time (+ night dimming)\r\n[*] Falling leaves & petals\r\n[*] Caustics, feeding, shy fish\r\n[*] Fish count / size / speed / colour theme, water hue, ripple strength\r\n[*] Weather: clear / rain / heavy rain / snow, auto cycle + interval\r\n[/list]\r\n\r\n[hr][/hr]\r\n[i]静下来,看看水。/ Sit back and watch the water.[/i]",
+	"file" : "index.html",
+	"general" : 
+	{
+		"localization" : 
+		{
+			"en-us" : 
+			{
+				"ui_day_cycle" : "Light Follows Real Time",
+				"ui_enable_caustics" : "Enable Light Caustics",
+				"ui_enable_feeding" : "Enable Feeding on Click",
+				"ui_fish_count" : "Number of Koi",
+				"ui_fish_size" : "Fish Size Multiplier",
+				"ui_fish_speed" : "Fish Speed Multiplier",
+				"ui_idle_events" : "Falling Leaves & Petals",
+				"ui_night_dim" : "Night Dimming",
+				"ui_ripple_strength" : "Ripple Strength",
+				"ui_shy_fish" : "Fish Avoid Cursor (Shy)",
+				"ui_water_hue" : "Water Color Hue",
+				"ui_weather" : "Weather",
+				"ui_weather_auto" : "Auto Weather Cycle",
+				"ui_weather_auto_minutes" : "Cycle Interval (min)",
+				"ui_weather_clear" : "Clear",
+				"ui_weather_heavyrain" : "Heavy Rain",
+				"ui_weather_rain" : "Rain",
+				"ui_weather_real" : "Match Real Local Weather",
+				"ui_weather_snow" : "Snow"
+			},
+			"zh-chs" :
+			{
+				"ui_day_cycle" : "光随时间走",
+				"ui_enable_caustics" : "水面的光感",
+				"ui_enable_feeding" : "点击投食",
+				"ui_fish_count" : "锦鲤数量",
+				"ui_fish_size" : "鱼的体量",
+				"ui_fish_speed" : "游动速度",
+				"ui_idle_events" : "落叶与花瓣",
+				"ui_night_dim" : "夜间暗度",
+				"ui_ripple_strength" : "涟漪强度",
+				"ui_shy_fish" : "鱼躲鼠标",
+				"ui_water_hue" : "水色",
+				"ui_weather" : "天气",
+				"ui_weather_auto" : "天气自动轮换",
+				"ui_weather_auto_minutes" : "轮换间隔(分钟)",
+				"ui_weather_clear" : "晴",
+				"ui_weather_heavyrain" : "大雨",
+				"ui_weather_rain" : "雨",
+				"ui_weather_real" : "跟随当地真实天气",
+				"ui_weather_snow" : "雪"
+			}
+		},
+		"properties" : 
+		{
+			"dayCycle" : 
+			{
+				"index" : 10,
+				"order" : 110,
+				"text" : "ui_day_cycle",
+				"type" : "bool",
+				"value" : true
+			},
+			"enableCaustics" : 
+			{
+				"index" : 5,
+				"order" : 105,
+				"text" : "ui_enable_caustics",
+				"type" : "bool",
+				"value" : true
+			},
+			"enableFeeding" : 
+			{
+				"index" : 6,
+				"order" : 106,
+				"text" : "ui_enable_feeding",
+				"type" : "bool",
+				"value" : true
+			},
+			"fishCount" : 
+			{
+				"index" : 0,
+				"max" : 200,
+				"min" : 10,
+				"order" : 100,
+				"text" : "ui_fish_count",
+				"type" : "slider",
+				"value" : 80
+			},
+			"fishSize" : 
+			{
+				"fraction" : true,
+				"index" : 1,
+				"max" : 3,
+				"min" : 0.5,
+				"order" : 101,
+				"precision" : 2,
+				"text" : "ui_fish_size",
+				"type" : "slider",
+				"value" : 1.45
+			},
+			"fishSpeed" : 
+			{
+				"fraction" : true,
+				"index" : 2,
+				"max" : 3,
+				"min" : 0.5,
+				"order" : 102,
+				"precision" : 2,
+				"text" : "ui_fish_speed",
+				"type" : "slider",
+				"value" : 1.5
+			},
+			"idleEvents" : 
+			{
+				"index" : 9,
+				"order" : 109,
+				"text" : "ui_idle_events",
+				"type" : "bool",
+				"value" : true
+			},
+			"nightDim" : 
+			{
+				"fraction" : true,
+				"index" : 11,
+				"max" : 1.3,
+				"min" : 0,
+				"order" : 111,
+				"precision" : 2,
+				"text" : "ui_night_dim",
+				"type" : "slider",
+				"value" : 1
+			},
+			"rippleStrength" : 
+			{
+				"fraction" : true,
+				"index" : 4,
+				"max" : 5,
+				"min" : 0.1,
+				"order" : 104,
+				"precision" : 2,
+				"text" : "ui_ripple_strength",
+				"type" : "slider",
+				"value" : 1
+			},
+			"schemecolor" : 
+			{
+				"order" : 0,
+				"text" : "ui_browse_properties_scheme_color",
+				"type" : "color",
+				"value" : "0 0 0"
+			},
+			"shyFish" : 
+			{
+				"index" : 7,
+				"order" : 107,
+				"text" : "ui_shy_fish",
+				"type" : "bool",
+				"value" : true
+			},
+			"waterHue" : 
+			{
+				"index" : 3,
+				"max" : 360,
+				"min" : 0,
+				"order" : 103,
+				"text" : "ui_water_hue",
+				"type" : "slider",
+				"value" : 195
+			},
+			"weather" :
+			{
+				"index" : 8,
+				"options" :
+				[
+					{
+						"label" : "ui_weather_clear",
+						"value" : 0
+					},
+					{
+						"label" : "ui_weather_rain",
+						"value" : 1
+					},
+					{
+						"label" : "ui_weather_heavyrain",
+						"value" : 2
+					},
+					{
+						"label" : "ui_weather_snow",
+						"value" : 3
+					}
+				],
+				"order" : 108,
+				"text" : "ui_weather",
+				"type" : "combo",
+				"value" : 0
+			},
+			"weatherAuto" :
+			{
+				"index" : 12,
+				"order" : 113,
+				"text" : "ui_weather_auto",
+				"type" : "bool",
+				"value" : false
+			},
+			"weatherAutoMinutes" :
+			{
+				"fraction" : false,
+				"index" : 13,
+				"max" : 60,
+				"min" : 1,
+				"order" : 114,
+				"precision" : 0,
+				"text" : "ui_weather_auto_minutes",
+				"type" : "slider",
+				"value" : 5
+			},
+			"realWeather" :
+			{
+				"index" : 14,
+				"order" : 115,
+				"text" : "ui_weather_real",
+				"type" : "bool",
+				"value" : true
+			}
+		}
+	},
+	"preview" : "preview.gif",
+	"ratingsex" : "none",
+	"ratingviolence" : "none",
+	"tags" : [ "Relaxing" ],
+	"title" : "摸鱼 (Mō Yú) — Interactive Fish Pond Wallpaper",
+	"type" : "web",
+	"version" : 1,
+	"visibility" : "private",
+	"workshopid" : "3808790239",
+	"workshopurl" : "steam://url/CommunityFilePage/3808790239"
+}

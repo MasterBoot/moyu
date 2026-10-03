@@ -1,0 +1,14 @@
+{
+  "name": "mo-yu-interactive-fish-pond-wallpaper",
+  "private": true,
+  "version": "1.0.0",
+  "description": "摸鱼 (Mō Yú) — interactive koi pond wallpaper (Wallpaper Engine / Lively / standalone browser)",
+  "type": "module",
+  "scripts": {
+    "bundle": "node tools/bundle.js",
+    "test": "node --test \"tests/**/*.test.mjs\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

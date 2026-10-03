@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koi Pond Wallpaper</title>
+    <!-- 首帧底色内联:外部 style.css 要等一个请求,而这几毫秒里露出来的是 WE/CEF 的默认白。
+     内联之后 HTML 一解析完就是深水色,白闪被压到最短。值必须与 style.css 的 body 底色一致。 -->
+<style>html,body{background:#0a1f20}</style>
+<!-- 两张大图(池底 3.2MB + 光带 1.1MB,均为无损 WebP,用户定版不压缩)原来是等
+     4 个 JS 全部下载执行后才由 new Image() 发起请求;preload 让它们在 HTML 解析期
+     就开始下载,与 JS 并行 —— 首帧出真实背景的时间明显提前。 -->
+<link rel="preload" as="image" href="assets/pond-background-v7.webp">
+<link rel="preload" as="image" href="assets/light-water-ribbons-v2.webp">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="vignette"></div>
+    <canvas id="wallpaper-canvas"></canvas>
+    <!-- 形状真源:编辑器(editor.html)和壁纸共用同一份,必须在 script.js 之前加载 -->
+    <script src="theme.js"></script>
+    <script src="koishape.js"></script>
+    <!-- 光感 / 涟漪的 WebGL 生成器(值 = 用户认可的基线,见 watergl.js 头部注释)。
+         它只生成"要叠上去的那张图",合成仍然由 script.js 的 ctx 做 ——
+         所以池塘、鱼、饲料、时间、水面扰动全都不动。 -->
+    <script src="watergl.js"></script>
+    <script>globalThis.KoiShared = { THEME, KOI_SHAPE, WaterGL };</script>
+    <!-- src/app.js usa import/export de ES modules; bajo file:// (Wallpaper
+         Engine, doble clic en index.html, la mayoria de apps que solo cargan
+         el HTML) Chromium bloquea esos modulos por CORS y la pagina se queda
+         en blanco. app.bundle.js es el mismo codigo compilado con esbuild a
+         un script normal (IIFE) que funciona en cualquier host. Para
+         regenerarlo tras editar algo en src/: node tools/bundle.js -->
+    <script src="src/app.bundle.js"></script>
+</body>
+</html>
