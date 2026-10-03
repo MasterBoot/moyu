@@ -36,7 +36,9 @@ const FIELDS = [
 	{ key: 'realWeather', type: 'bool', label: '跟随当地真实天气' },
 	{ key: 'weatherAuto', type: 'bool', label: '天气自动轮换' },
 	{ key: 'weatherAutoMinutes', type: 'range', label: '轮换间隔(分钟)', min: 1, max: 60, step: 1 },
-	{ key: 'ambientVolume', type: 'range', label: '环境音量', min: 0, max: 1, step: 0.01 }
+	{ key: 'ambientVolume', type: 'range', label: '环境音量', min: 0, max: 1, step: 0.01 },
+	{ key: 'fps', type: 'range', label: '帧率上限(0=不限)', min: 0, max: 60, step: 5 },
+	{ key: 'pureMode', type: 'bool', label: '纯净模式(隐藏时钟/鱼名)' }
 ];
 
 const CSS = `
@@ -51,7 +53,7 @@ const CSS = `
     box-shadow: 0 2px 10px rgba(0,0,0,0.35);
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
-#koi-settings-gear:hover { border-color: var(--koi-accent, #d88796); color: var(--koi-accent, #d88796); transform: scale(1.06); }
+#koi-settings-gear:hover { border-color: var(--koi-accent, #d88796); color: var(--koi-accent, #d88796); transform: scale(1.06); opacity: 1 !important; }
 #koi-settings-gear svg { width: 19px; height: 19px; display: block; overflow: visible; }
 #koi-settings-panel {
     position: fixed; left: 16px; bottom: 60px; z-index: 20;
@@ -198,6 +200,7 @@ export function createSettingsPanel({ config }) {
 			// sub-slider de nightDim visualmente atenuado si dayCycle esta apagado
 			// (nightDim solo se nota de noche, y sin dayCycle nunca es de noche).
 			if (configKey === 'dayCycle') updateSubRows();
+			if (configKey === 'pureMode') applyPureMode();
 		}
 		if (spec.type === 'range') {
 			input.addEventListener('input', () => {
@@ -211,10 +214,16 @@ export function createSettingsPanel({ config }) {
 		}
 	});
 
-	function updateSubRows() {
-		const dayCycleOn = config.dayCycle !== false;
-		panel.querySelectorAll('.row.sub').forEach(r => { r.style.opacity = dayCycleOn ? '' : '0.4'; });
-	}
+		function updateSubRows() {
+			const dayCycleOn = config.dayCycle !== false;
+			panel.querySelectorAll('.row.sub').forEach(r => { r.style.opacity = dayCycleOn ? '' : '0.4'; });
+		}
+
+		/* 纯净模式:齿轮压暗但保持可点(悬停恢复),面板里随时关掉 */
+		function applyPureMode() {
+			gear.style.transition = 'opacity .3s ease';
+			gear.style.opacity = config.pureMode ? '0.22' : '';
+		}
 
 	function refresh() {
 		for (const key in controls) {
@@ -225,6 +234,7 @@ export function createSettingsPanel({ config }) {
 			else input.value = v;
 		}
 		updateSubRows();
+		applyPureMode();
 	}
 
 	function open() { panel.classList.add('open'); refresh(); }
@@ -256,6 +266,7 @@ export function createSettingsPanel({ config }) {
 	if (window.wallpaperPropertyListener && prevApply) {
 		window.wallpaperPropertyListener.applyUserProperties = function (props) {
 			prevApply(props);
+			applyPureMode();                     // 齿轮明暗只关乎 config.pureMode,不问来源
 			if (panel.classList.contains('open')) refresh();
 		};
 	}

@@ -29,12 +29,12 @@ export function registerBuiltins({ creatures, features, context }) {
     });
     creatures.register({ id: 'koi-fish', title: '锦鲤', create: koiKind.create, exports: koiKind });
 
-    // ── 玩法:时钟(沉在水下的 hud 层) ──
+    // ── 玩法:时钟(沉在水下的 hud 层;纯净模式时一并隐去,config 每帧现读) ──
     features.register({ id: 'clock', title: '时钟', create: () => {
         const clock = createClock({ viewport: context.viewport });
         let on = true;
         return {
-            layers: { hud: g => { if (on) clock.draw(g); } },
+            layers: { hud: g => { if (on && context.config.pureMode !== true) clock.draw(g); } },
             setEnabled(next) { on = !!next; }        // 与第一轮一致:关掉只是不画,不是卸载
         };
     } });
@@ -101,10 +101,10 @@ export function registerBuiltins({ creatures, features, context }) {
         environment: context.environment, spawnRipple: context.spawnRipple
     }) });
 
-    // ── 玩法:名字与入口覆盖层(ui 层) ──
+    // ── 玩法:名字与入口覆盖层(ui 层;纯净模式时一并隐去) ──
     features.register({ id: 'overlay', title: '覆盖层', create: () => {
         const overlay = createOverlay({ kois: context.kois, mouse: context.mouse });
-        return { layers: { ui: g => overlay.draw(g) } };
+        return { layers: { ui: g => { if (context.config.pureMode !== true) overlay.draw(g); } } };
     } });
 
     return { creatures, features };

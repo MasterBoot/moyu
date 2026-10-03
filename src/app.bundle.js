@@ -325,6 +325,9 @@
     // 环境音量(0~1,0 = 静音)。WebAudio 合成,无音频文件(见 features/ambient-audio.js):
     // 水声底噪 / 雨声跟雨量 / 夜虫昼鸟(合成)/ 大雨雷声。夜里水雨声自动压半。
     ambientVolume: 0.5,
+    // 纯净模式(2026-10-03):隐藏时钟与鱼名等一切 UI,齿轮变暗但可点(悬停恢复),
+    // 截图/录屏党用。config 是唯一真源,时钟/覆盖层每帧读它(builtins.js)。
+    pureMode: false,
     // 夜间暗度倍率(0~1.3,1.0 = 现在这版观感)。夜里太暗是这功能最大的口味分歧点,给一根细旋钮。
     nightDim: 1
   };
@@ -2546,7 +2549,7 @@
   }
   function attachProperties(config, syncKois) {
     const previous = window.wallpaperPropertyListener, previousLively = window.livelyPropertyListener;
-    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 5], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60], ambientVolume: [0, 1] };
+    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 5], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60], ambientVolume: [0, 1], fps: [0, 60] };
     const applyUserProperties = (properties) => {
       for (const [key, property] of Object.entries(properties || {})) {
         if (!(key in config) || !property || !("value" in property)) continue;
@@ -2556,7 +2559,7 @@
           if (!Number.isFinite(value)) continue;
           const [min, max] = numeric[key];
           value = Math.max(min, Math.min(max, value));
-          if (key === "fishCount" || key === "weather" || key === "weatherAutoMinutes") value = Math.round(value);
+          if (key === "fishCount" || key === "weather" || key === "weatherAutoMinutes" || key === "fps") value = Math.round(value);
         } else if (typeof config[key] === "boolean") {
           if (typeof value !== "boolean") continue;
         } else continue;
@@ -2597,7 +2600,9 @@
     { key: "realWeather", type: "bool", label: "\u8DDF\u968F\u5F53\u5730\u771F\u5B9E\u5929\u6C14" },
     { key: "weatherAuto", type: "bool", label: "\u5929\u6C14\u81EA\u52A8\u8F6E\u6362" },
     { key: "weatherAutoMinutes", type: "range", label: "\u8F6E\u6362\u95F4\u9694(\u5206\u949F)", min: 1, max: 60, step: 1 },
-    { key: "ambientVolume", type: "range", label: "\u73AF\u5883\u97F3\u91CF", min: 0, max: 1, step: 0.01 }
+    { key: "ambientVolume", type: "range", label: "\u73AF\u5883\u97F3\u91CF", min: 0, max: 1, step: 0.01 },
+    { key: "fps", type: "range", label: "\u5E27\u7387\u4E0A\u9650(0=\u4E0D\u9650)", min: 0, max: 60, step: 5 },
+    { key: "pureMode", type: "bool", label: "\u7EAF\u51C0\u6A21\u5F0F(\u9690\u85CF\u65F6\u949F/\u9C7C\u540D)" }
   ];
   var CSS = `
 #koi-settings-gear {
@@ -2611,7 +2616,7 @@
     box-shadow: 0 2px 10px rgba(0,0,0,0.35);
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
-#koi-settings-gear:hover { border-color: var(--koi-accent, #d88796); color: var(--koi-accent, #d88796); transform: scale(1.06); }
+#koi-settings-gear:hover { border-color: var(--koi-accent, #d88796); color: var(--koi-accent, #d88796); transform: scale(1.06); opacity: 1 !important; }
 #koi-settings-gear svg { width: 19px; height: 19px; display: block; overflow: visible; }
 #koi-settings-panel {
     position: fixed; left: 16px; bottom: 60px; z-index: 20;
@@ -2741,6 +2746,7 @@
           window.wallpaperPropertyListener.applyUserProperties({ [configKey]: { value: v } });
         }
         if (configKey === "dayCycle") updateSubRows();
+        if (configKey === "pureMode") applyPureMode();
       }
       if (spec.type === "range") {
         input.addEventListener("input", () => {
@@ -2759,6 +2765,10 @@
         r.style.opacity = dayCycleOn ? "" : "0.4";
       });
     }
+    function applyPureMode() {
+      gear.style.transition = "opacity .3s ease";
+      gear.style.opacity = config.pureMode ? "0.22" : "";
+    }
     function refresh() {
       for (const key in controls) {
         const { input, spec } = controls[key];
@@ -2768,6 +2778,7 @@
         else input.value = v;
       }
       updateSubRows();
+      applyPureMode();
     }
     function open() {
       panel.classList.add("open");
@@ -2796,6 +2807,7 @@
     if (window.wallpaperPropertyListener && prevApply) {
       window.wallpaperPropertyListener.applyUserProperties = function(props) {
         prevApply(props);
+        applyPureMode();
         if (panel.classList.contains("open")) refresh();
       };
     }
@@ -5210,7 +5222,7 @@
       let on = true;
       return {
         layers: { hud: (g) => {
-          if (on) clock.draw(g);
+          if (on && context.config.pureMode !== true) clock.draw(g);
         } },
         setEnabled(next) {
           on = !!next;
@@ -5292,7 +5304,9 @@
     }) });
     features.register({ id: "overlay", title: "\u8986\u76D6\u5C42", create: () => {
       const overlay = createOverlay({ kois: context.kois, mouse: context.mouse });
-      return { layers: { ui: (g) => overlay.draw(g) } };
+      return { layers: { ui: (g) => {
+        if (context.config.pureMode !== true) overlay.draw(g);
+      } } };
     } });
     return { creatures, features };
   }

@@ -10,6 +10,7 @@
 			{
 				"ui_ambient_volume" : "Ambient Volume",
 				"ui_day_cycle" : "Light Follows Real Time",
+				"ui_pure_mode" : "Pure Mode",
 				"ui_enable_caustics" : "Enable Light Caustics",
 				"ui_enable_feeding" : "Enable Feeding on Click",
 				"ui_fish_count" : "Number of Koi",
@@ -35,6 +36,7 @@
 			{
 				"ui_ambient_volume" : "环境音量",
 				"ui_day_cycle" : "光随时间走",
+				"ui_pure_mode" : "纯净模式",
 				"ui_enable_caustics" : "水面的光感",
 				"ui_enable_feeding" : "点击投食",
 				"ui_fish_count" : "锦鲤数量",
@@ -248,6 +250,14 @@
 				"text" : "ui_ambient_volume",
 				"type" : "slider",
 				"value" : 0.5
+			},
+			"pureMode" :
+			{
+				"index" : 16,
+				"order" : 117,
+				"text" : "ui_pure_mode",
+				"type" : "bool",
+				"value" : false
 			}
 		}
 	},
