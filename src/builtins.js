@@ -17,6 +17,7 @@ import { createIdleDrift } from './features/idle-drift.js';
 import { createDayCycle } from './features/day-cycle.js';
 import { createFishMood } from './features/fish-mood.js';
 import { createAmbientAudio } from './features/ambient-audio.js';
+import { createNightSky } from './features/night-sky.js';
 
 export function registerBuiltins({ creatures, features, context }) {
     // ── 生物:锦鲤(默认 kind,鱼种不声明 creature 时用它) ──
@@ -92,6 +93,12 @@ export function registerBuiltins({ creatures, features, context }) {
     // ── 玩法:环境音效(WebAudio 全合成,无音频文件;音量 = config.ambientVolume,面板滑杆) ──
     features.register({ id: 'audio', title: '环境音效', create: () => createAmbientAudio({
         config: context.config, environment: context.environment
+    }) });
+
+    // ── 玩法:夜空(萤火虫/流星;夜度驱动,dayCycle 关 = 恒白昼 = 不出现) ──
+    features.register({ id: 'nightSky', title: '夜空', create: () => createNightSky({
+        config: context.config, viewport: context.viewport,
+        environment: context.environment, spawnRipple: context.spawnRipple
     }) });
 
     // ── 玩法:名字与入口覆盖层(ui 层) ──

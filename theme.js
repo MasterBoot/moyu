@@ -233,6 +233,16 @@ const THEME = {
                     mood: { speed: 0.95, band: 0.50, pull: 0.20 } }
     },
 
+    /* ---------- 夜空:萤火虫 / 流星(2026-10-03)----------
+     * 都由 features/night-sky.js 驱动,可见度 = 夜度(dayPhase.dim,与夜虫鸣同源)
+     * —— dayCycle 关掉时 dim 恒 0,这两样自然不出现。
+     * 萤火虫:池边游荡的小光点,各自独立呼吸明灭;流星:深夜低频划过一道,
+     * 落点起一圈涟漪(俯视视角里流星是水面倒影,"倒影熄灭处起澜"才自洽)。 */
+    night: {
+        fireflies: { seed: 0xF1E5, count: 8, speed: [8, 20], blink: [2.2, 4.2] },
+        meteor: { seed: 0x5EED, minNight: 0.55, every: [45, 110], speed: [900, 1300], len: [90, 150], life: [0.45, 0.75] }
+    },
+
     /* ---------- 自持事件:落叶 / 花瓣(2026-09-26 接入) ----------
      * "无人值守时画面自己发生的事"。数值全部来自实验页
      * experiments/idle-events-mock/on-real-pond.html 的定版(用户看过并认可),

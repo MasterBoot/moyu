@@ -4972,6 +4972,214 @@
     };
   }
 
+  // src/render/fireflies.js
+  function createFireflies({ viewport, fireflies = {} }) {
+    var _a;
+    const rng = mulberry32((_a = fireflies.seed) != null ? _a : 61925);
+    const count = Math.max(1, fireflies.count || 8);
+    const speedR = fireflies.speed || [8, 20];
+    const blinkR = fireflies.blink || [2.2, 4.2];
+    const pick = (r) => r[0] + rng() * (r[1] - r[0]);
+    let sprite = null;
+    function bake() {
+      if (sprite || typeof document === "undefined") return sprite;
+      const S = 32;
+      const c = document.createElement("canvas");
+      c.width = c.height = S;
+      const g = c.getContext("2d");
+      const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+      gr.addColorStop(0, "rgba(238,255,192,1)");
+      gr.addColorStop(0.35, "rgba(202,236,132,0.4)");
+      gr.addColorStop(1, "rgba(180,225,110,0)");
+      g.fillStyle = gr;
+      g.fillRect(0, 0, S, S);
+      sprite = c;
+      return sprite;
+    }
+    const pool = [];
+    for (let i = 0; i < count; i++) {
+      pool.push({
+        x: 30 + rng() * Math.max(1, viewport.width - 60),
+        y: 30 + rng() * Math.max(1, viewport.height - 60),
+        ang: rng() * Math.PI * 2,
+        spd: pick(speedR),
+        ph: rng() * Math.PI * 2,
+        fq: pick(blinkR)
+      });
+    }
+    return {
+      get count() {
+        return count;
+      },
+      /** amount = 夜度 0~1(白天萤火虫不存在) */
+      update(dt, amount) {
+        const w = Math.max(1, viewport.width), h = Math.max(1, viewport.height);
+        for (const f of pool) {
+          f.ang += (rng() - 0.5) * 1.6 * dt;
+          const spd = f.spd * (0.3 + 0.7 * amount);
+          f.x += Math.cos(f.ang) * spd * dt;
+          f.y += Math.sin(f.ang) * spd * dt;
+          if (f.x < 24) {
+            f.x = 24;
+            f.ang = Math.PI - f.ang;
+          }
+          if (f.x > w - 24) {
+            f.x = w - 24;
+            f.ang = Math.PI - f.ang;
+          }
+          if (f.y < 24) {
+            f.y = 24;
+            f.ang = -f.ang;
+          }
+          if (f.y > h - 24) {
+            f.y = h - 24;
+            f.ang = -f.ang;
+          }
+          f.ph += f.fq * dt;
+        }
+      },
+      draw(g, amount) {
+        const sp = bake();
+        if (!sp || amount <= 0.01) return;
+        const wasOp = g.globalCompositeOperation, wasA = g.globalAlpha;
+        g.globalCompositeOperation = "screen";
+        for (let i = 0; i < pool.length; i++) {
+          const f = pool[i];
+          const pulse = Math.max(0, Math.sin(f.ph));
+          const a = pulse * pulse * amount;
+          if (a < 0.02) continue;
+          g.globalAlpha = a * 0.55;
+          g.drawImage(sp, f.x - 8, f.y - 8, 16, 16);
+          g.globalAlpha = a;
+          g.fillStyle = "rgba(244,255,208,1)";
+          g.beginPath();
+          g.arc(f.x, f.y, 1.3, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.globalAlpha = wasA;
+        g.globalCompositeOperation = wasOp;
+      },
+      clear() {
+      },
+      inspect: () => ({ count, lit: pool.reduce((n, f) => n + (Math.sin(f.ph) > 0.3 ? 1 : 0), 0) })
+    };
+  }
+
+  // src/render/meteor.js
+  function createMeteor({ viewport, meteor = {}, onLand }) {
+    var _a;
+    const rng = mulberry32((_a = meteor.seed) != null ? _a : 24301);
+    const minNight = Number.isFinite(meteor.minNight) ? meteor.minNight : 0.55;
+    const everyR = meteor.every || [45, 110];
+    const speedR = meteor.speed || [900, 1300];
+    const lenR = meteor.len || [90, 150];
+    const lifeR = meteor.life || [0.45, 0.75];
+    const pick = (r) => r[0] + rng() * (r[1] - r[0]);
+    let m = null;
+    let timer = Number.isFinite(meteor.first) ? meteor.first : 12 + rng() * 20;
+    function spawn() {
+      const w = Math.max(1, viewport.width), h = Math.max(1, viewport.height);
+      const dir = rng() < 0.5 ? -1 : 1;
+      const ang = Math.PI / 180 * (28 + rng() * 22);
+      const spd = pick(speedR);
+      m = {
+        x: w * (0.15 + rng() * 0.7),
+        y: h * rng() * 0.22,
+        vx: Math.cos(ang) * spd * dir,
+        vy: Math.sin(ang) * spd,
+        len: pick(lenR),
+        life: pick(lifeR),
+        t: 0
+      };
+    }
+    return {
+      /** night = 夜度 0~1(过门槛才倒计时) */
+      update(dt, night) {
+        if (m) {
+          m.t += dt;
+          m.x += m.vx * dt;
+          m.y += m.vy * dt;
+          if (m.t >= m.life) {
+            const lx4 = m.x, ly4 = m.y;
+            m = null;
+            timer = pick(everyR);
+            if (onLand) onLand(lx4, ly4);
+          }
+        } else if (night > minNight) {
+          timer -= dt;
+          if (timer <= 0) spawn();
+        }
+      },
+      draw(g) {
+        if (!m) return;
+        const fade = Math.sin(Math.PI * Math.min(1, m.t / m.life));
+        const sp = Math.hypot(m.vx, m.vy) || 1;
+        const tx = m.x - m.vx / sp * m.len, ty = m.y - m.vy / sp * m.len;
+        g.save();
+        g.globalCompositeOperation = "screen";
+        if (typeof g.createLinearGradient === "function") {
+          const grad = g.createLinearGradient(m.x, m.y, tx, ty);
+          grad.addColorStop(0, "rgba(255,255,255," + (0.85 * fade).toFixed(3) + ")");
+          grad.addColorStop(1, "rgba(255,255,255,0)");
+          g.strokeStyle = grad;
+        } else {
+          g.strokeStyle = "rgba(255,255,255," + (0.6 * fade).toFixed(3) + ")";
+        }
+        g.lineWidth = 1.8;
+        g.lineCap = "round";
+        g.beginPath();
+        g.moveTo(m.x, m.y);
+        g.lineTo(tx, ty);
+        g.stroke();
+        g.fillStyle = "rgba(255,255,255," + (0.95 * fade).toFixed(3) + ")";
+        g.beginPath();
+        g.arc(m.x, m.y, 1.6, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      },
+      clear() {
+        m = null;
+      },
+      inspect: () => ({ live: !!m, timer: Math.round(timer), progress: m ? +(m.t / m.life).toFixed(2) : null })
+    };
+  }
+
+  // src/features/night-sky.js
+  function createNightSky({ config, viewport, environment, spawnRipple }) {
+    const N = THEME.night || {};
+    const flies = createFireflies({ viewport, fireflies: N.fireflies || {} });
+    const meteor = createMeteor({
+      viewport,
+      meteor: N.meteor || {},
+      onLand: (x, y) => spawnRipple(x, y, 0.7 * (Number(config.rippleStrength) || 1))
+    });
+    let on = true;
+    let amt = 0;
+    return {
+      settleWhileDisabled: true,
+      // 关掉也要把萤火虫淡完,别冻在半空
+      update(dt) {
+        const target = on ? nightnessFromDim(environment.dayPhase && environment.dayPhase.dim || 0) : 0;
+        amt += (target - amt) * Math.min(1, dt / 2);
+        flies.update(dt, amt);
+        meteor.update(dt, amt);
+      },
+      layers: {
+        weather: (g) => {
+          flies.draw(g, amt);
+          meteor.draw(g);
+        }
+      },
+      setEnabled(next) {
+        on = !!next;
+      },
+      dispose() {
+        meteor.clear();
+      },
+      inspect: () => ({ night: +amt.toFixed(2), flies: flies.inspect(), meteor: meteor.inspect() })
+    };
+  }
+
   // src/builtins.js
   function registerBuiltins({ creatures, features, context }) {
     const koiKind = createKoiCreature({
@@ -5064,6 +5272,12 @@
     features.register({ id: "audio", title: "\u73AF\u5883\u97F3\u6548", create: () => createAmbientAudio({
       config: context.config,
       environment: context.environment
+    }) });
+    features.register({ id: "nightSky", title: "\u591C\u7A7A", create: () => createNightSky({
+      config: context.config,
+      viewport: context.viewport,
+      environment: context.environment,
+      spawnRipple: context.spawnRipple
     }) });
     features.register({ id: "overlay", title: "\u8986\u76D6\u5C42", create: () => {
       const overlay = createOverlay({ kois: context.kois, mouse: context.mouse });
