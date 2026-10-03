@@ -4066,6 +4066,124 @@
     };
   }
 
+  // src/render/bank-snow.js
+  function createBankSnow({ viewport, bankSnow = {} }) {
+    var _a, _b, _c, _d, _e;
+    const rng = mulberry32((_a = bankSnow.seed) != null ? _a : 20973);
+    const edgeAlpha = (_b = bankSnow.edgeAlpha) != null ? _b : 0.55;
+    const insetTop = (_c = bankSnow.insetTop) != null ? _c : 0.16;
+    const insetSide = (_d = bankSnow.insetSide) != null ? _d : 0.12;
+    const grains = (_e = bankSnow.grains) != null ? _e : 260;
+    let tex = null, texW = 0, texH = 0;
+    function build() {
+      const w = Math.max(2, viewport.width | 0), h = Math.max(2, viewport.height | 0);
+      const short = Math.min(w, h);
+      const top = short * insetTop, bottom = short * insetTop * 0.7, side = short * insetSide;
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d");
+      const R = mulberry32(rng());
+      const band = (gx0, gy0, gx1, gy1, rect, a0) => {
+        const gr = g.createLinearGradient(gx0, gy0, gx1, gy1);
+        gr.addColorStop(0, "rgba(255,255,255," + a0 + ")");
+        gr.addColorStop(0.55, "rgba(250,252,255," + (a0 * 0.5).toFixed(3) + ")");
+        gr.addColorStop(1, "rgba(250,252,255,0)");
+        g.fillStyle = gr;
+        g.fillRect(rect[0], rect[1], rect[2], rect[3]);
+      };
+      band(0, 0, 0, top, [0, 0, w, top], edgeAlpha);
+      band(0, h, 0, h - bottom, [0, h - bottom, w, bottom], edgeAlpha * 0.85);
+      band(0, 0, side, 0, [0, 0, side, h], edgeAlpha * 0.9);
+      band(w, 0, w - side, 0, [w - side, 0, side, h], edgeAlpha * 0.9);
+      g.fillStyle = "rgba(252,253,255,0.5)";
+      const lobes = Math.round((w + h) / 90);
+      for (let i = 0; i < lobes; i++) {
+        let t = R() * (w + h);
+        let x, y, depth;
+        if (t < w) {
+          x = t;
+          y = 0;
+          depth = top;
+        } else if ((t -= w) < h) {
+          x = w;
+          y = t;
+          depth = side;
+        } else if ((t -= h) < w) {
+          x = w - t;
+          y = h;
+          depth = bottom;
+        } else {
+          t -= w;
+          x = 0;
+          y = h - t;
+          depth = side;
+        }
+        const r = short * (0.02 + R() * 0.035);
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fill();
+      }
+      for (let i = 0; i < grains; i++) {
+        const perim = 2 * (w + h);
+        let t = R() * perim, x, y, nx, ny, inset;
+        if (t < w) {
+          x = t;
+          y = 0;
+          nx = 0;
+          ny = 1;
+          inset = top;
+        } else if ((t -= w) < h) {
+          x = w;
+          y = t;
+          nx = -1;
+          ny = 0;
+          inset = side;
+        } else if ((t -= h) < w) {
+          x = w - t;
+          y = h;
+          nx = 0;
+          ny = -1;
+          inset = bottom;
+        } else {
+          t -= w;
+          x = 0;
+          y = h - t;
+          nx = 1;
+          ny = 0;
+          inset = side;
+        }
+        const depth = Math.min(1, -Math.log(1 - R() * 0.999) / 2.6);
+        const bright = R();
+        g.globalAlpha = 0.12 + bright * 0.3;
+        g.fillStyle = bright > 0.82 ? "rgba(255,255,255,1)" : "rgba(244,248,252,1)";
+        g.beginPath();
+        g.arc(x + nx * depth * inset, y + ny * depth * inset, 0.8 + R() * 1.8, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.globalAlpha = 1;
+      tex = c;
+      texW = w;
+      texH = h;
+    }
+    function draw(g, amount) {
+      if (typeof document === "undefined") return;
+      if (!tex || texW !== viewport.width || texH !== viewport.height) build();
+      if (!tex) return;
+      g.save();
+      g.globalAlpha = Math.max(0, Math.min(1, amount));
+      g.drawImage(tex, 0, 0);
+      g.restore();
+    }
+    return {
+      draw,
+      dispose() {
+        tex = null;
+      },
+      inspect: () => ({ built: !!tex, w: texW, h: texH })
+    };
+  }
+
   // src/features/weather.js
   function mapWeatherCode(code, precipitation = 0) {
     const c = Number(code) | 0;
@@ -4085,6 +4203,9 @@
     const frostCfg = THEME.weather && THEME.weather.snow && THEME.weather.snow.snow && THEME.weather.snow.snow.frost || {};
     const frost = createFrost({ viewport, frost: frostCfg });
     let frostAmt = 0;
+    const bankCfg = THEME.weather && THEME.weather.snow && THEME.weather.snow.snow && THEME.weather.snow.snow.bankSnow || {};
+    const bank = createBankSnow({ viewport, bankSnow: bankCfg });
+    let bankAmt = 0;
     let flash = 0, flashSecond = false, lightningTimer = 10;
     const REAL_REFRESH = 30 * 60 * 1e3;
     const FETCH_TIMEOUT = 8e3;
@@ -4203,6 +4324,9 @@
         const frostStep = dt / 5;
         frostAmt += Math.max(-frostStep, Math.min(frostStep, frostTarget - frostAmt));
         if (frostAmt < 3e-3) frostAmt = 0;
+        const bankTarget = enabled && environment.snowSpec ? 1 : 0;
+        if (bankTarget > bankAmt) bankAmt = Math.min(bankTarget, bankAmt + dt / 45);
+        else bankAmt = Math.max(0, bankAmt - dt / 150);
         if (enabled && environment.isStorm) {
           lightningTimer -= dt;
           if (lightningTimer <= 0) {
@@ -4235,6 +4359,10 @@
         }
       },
       layers: {
+        // 池边积雪:floor 层 = 池底之上、鱼之下 —— 雪在岸上,鱼从雪边游过不被盖住
+        floor: (g) => {
+          if (bankAmt > 3e-3) bank.draw(g, bankAmt);
+        },
         // 雾在最底下(它是"空气"),再雨坑(水面),再雨丝(空气),最后雪片 —— 全在 weather 层
         weather: (g) => {
           if (fogR) fogR.draw(g, environment.rainAmount);
@@ -4268,6 +4396,7 @@
         if (streaks) streaks.clear();
         if (flakes) flakes.clear();
         frost.dispose();
+        bank.dispose();
       },
       inspect: () => ({
         field,
@@ -4279,6 +4408,7 @@
         builtFor,
         rotT,
         frost: frostAmt,
+        bank: bankAmt,
         flash,
         real: {
           state: realState,
@@ -4369,6 +4499,57 @@
     };
   }
 
+  // src/core/season.js
+  var SEASON_PARAMS = Object.freeze({
+    spring: { leaf: 0.55, petal: 2, firefly: 1 },
+    summer: { leaf: 0.7, petal: 0.7, firefly: 1.3 },
+    autumn: { leaf: 2.2, petal: 0.35, firefly: 0.85 },
+    winter: { leaf: 0.3, petal: 0.15, firefly: 0.3 }
+  });
+  var SEASONS = Object.keys(SEASON_PARAMS);
+  var CENTERS = { spring: 105, summer: 196, autumn: 288, winter: 15 };
+  var FALLOFF = 60;
+  function seasonWeights(date = /* @__PURE__ */ new Date()) {
+    const start = Date.UTC(date.getFullYear(), 0, 0);
+    const doy = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - start) / 864e5);
+    const raw = {};
+    let sum = 0;
+    for (const k of SEASONS) {
+      let d = Math.abs(doy - CENTERS[k]);
+      if (d > 365 - d) d = 365 - d;
+      const w = Math.max(0, 1 - d / FALLOFF);
+      raw[k] = w;
+      sum += w;
+    }
+    if (sum <= 0) {
+      for (const k of SEASONS) raw[k] = 1 / SEASONS.length;
+      return raw;
+    }
+    for (const k of SEASONS) raw[k] /= sum;
+    return raw;
+  }
+  function seasonBlend(date = /* @__PURE__ */ new Date()) {
+    const w = seasonWeights(date);
+    const out = { leaf: 0, petal: 0, firefly: 0, weights: w };
+    for (const k of SEASONS) {
+      out.leaf += (w[k] || 0) * SEASON_PARAMS[k].leaf;
+      out.petal += (w[k] || 0) * SEASON_PARAMS[k].petal;
+      out.firefly += (w[k] || 0) * SEASON_PARAMS[k].firefly;
+    }
+    return out;
+  }
+  function seasonCached() {
+    let cache = null, at = 0;
+    return function() {
+      const now = Date.now();
+      if (!cache || now - at > 6e4) {
+        cache = seasonBlend();
+        at = now;
+      }
+      return cache;
+    };
+  }
+
   // src/features/idle-drift.js
   function createIdleDrift({ config, viewport, foods, input, mouse, kois }) {
     const P = THEME.idleDrift || {};
@@ -4394,6 +4575,7 @@
     const holds = [];
     const gathers = [];
     const timers = { leaf: 0, petal: 0 };
+    const season = seasonCached();
     let enabled = config.idleEvents !== false;
     let spawned = 0, landed = 0, startled = 0, gathered = 0;
     let sinceSpawn = 1e9;
@@ -4572,7 +4754,7 @@
               if (gapOk) {
                 if (drop(kind)) sinceSpawn = 0;
                 const r = P.rate && P.rate[kind] || [3, 1.5];
-                timers[kind] = r[0] + rng() * r[1];
+                timers[kind] = (r[0] + rng() * r[1]) * season()[kind];
               } else {
                 timers[kind] = 0;
               }
@@ -4611,6 +4793,7 @@
         startled,
         gathered,
         sinceSpawn,
+        season: season(),
         pending: { holds: holds.length, gathers: gathers.length },
         field,
         sprites: sprites2
@@ -5178,18 +5361,21 @@
     });
     let on = true;
     let amt = 0;
+    const season = seasonCached();
     return {
       settleWhileDisabled: true,
       // 关掉也要把萤火虫淡完,别冻在半空
       update(dt) {
         const target = on ? nightnessFromDim(environment.dayPhase && environment.dayPhase.dim || 0) : 0;
         amt += (target - amt) * Math.min(1, dt / 2);
-        flies.update(dt, amt);
+        const ffAmt = Math.min(1.3, amt * season().firefly);
+        flies.update(dt, ffAmt);
         meteor.update(dt, amt);
       },
       layers: {
         weather: (g) => {
-          flies.draw(g, amt);
+          const ffAmt = Math.min(1.3, amt * season().firefly);
+          flies.draw(g, ffAmt);
           meteor.draw(g);
         }
       },
@@ -5199,7 +5385,7 @@
       dispose() {
         meteor.clear();
       },
-      inspect: () => ({ night: +amt.toFixed(2), flies: flies.inspect(), meteor: meteor.inspect() })
+      inspect: () => ({ night: +amt.toFixed(2), season: season(), flies: flies.inspect(), meteor: meteor.inspect() })
     };
   }
 

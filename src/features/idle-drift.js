@@ -1,6 +1,7 @@
 import { createRainRipples } from '../render/ripples.js';
 import { createIdleSprites } from '../render/idle-sprites.js';
 import { mulberry32 } from '../shared/math.js';
+import { seasonCached } from '../core/season.js';
 import { THEME } from '../shared/legacy-assets.js';
 
 /**
@@ -61,6 +62,7 @@ export function createIdleDrift({ config, viewport, foods, input, mouse, kois })
     const holds = [];            // 惊扰:注入的鼠标位置还要保持多久
     const gathers = [];          // 聚集:延迟若干秒后塞吸引子(替代 setTimeout)
     const timers = { leaf: 0, petal: 0 };
+    const season = seasonCached();   // 季节节奏(2026-10-03):春花秋叶,冬几乎静
     let enabled = config.idleEvents !== false;
     let spawned = 0, landed = 0, startled = 0, gathered = 0;
     let sinceSpawn = 1e9;        // 距上一件多久(全局最小间隔用)
@@ -250,7 +252,8 @@ export function createIdleDrift({ config, viewport, foods, input, mouse, kois })
                         if (gapOk) {
                             if (drop(kind)) sinceSpawn = 0;
                             const r = (P.rate && P.rate[kind]) || [3, 1.5];
-                            timers[kind] = r[0] + rng() * r[1];
+                            /* 季节倍率:春天的花瓣、秋天的落叶比基准勤,冬天几乎静 */
+                            timers[kind] = (r[0] + rng() * r[1]) * season()[kind];
                         } else {
                             timers[kind] = 0;          // 压着,等最小间隔
                         }
@@ -278,6 +281,7 @@ export function createIdleDrift({ config, viewport, foods, input, mouse, kois })
         inspect: () => ({
             enabled, host: config.idleEvents !== false, cap: P.cap || 12,
             count: items.length, spawned, landed, startled, gathered, sinceSpawn,
+            season: season(),
             pending: { holds: holds.length, gathers: gathers.length },
             field, sprites
         })

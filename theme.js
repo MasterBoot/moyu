@@ -213,7 +213,10 @@ const THEME = {
                              * inset* 是相对【短边】的入深;blob/crystal 是晶斑/枝晶数量;
                              * tint 是冰白偏青的 RGB 串。数量是 1280×800 基准,别一把调太大。 */
                             frost: { seed: 0x5EED, edgeAlpha: 0.42, insetTop: 0.17, insetSide: 0.13,
-                                     blobCount: 220, crystalCount: 70, tint: '225,242,248' } },
+                                     blobCount: 220, crystalCount: 70, tint: '225,242,248' },
+                            /* 池边积雪(render/bank-snow.js):雪落在"岸上",画在 floor 层
+                             * (池底之上、鱼之下)。可见度由 weather 玩法驱动:积雪 45s、化雪 150s。 */
+                            bankSnow: { seed: 0x51ED, edgeAlpha: 0.55, insetTop: 0.16, insetSide: 0.12, grains: 260 } },
                     mood: { speed: 0.85, band: 0.66, pull: 0.30 } },
         /* 雷暴(2026-10-03):大雨的加强版 —— 雨丝更密更斜,天压到最暗;
          * lightning: true 让 features/weather.js 排 8~26s 一次的全屏闪电(farTint 层),

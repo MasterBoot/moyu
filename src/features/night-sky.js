@@ -2,6 +2,7 @@ import { THEME } from '../shared/legacy-assets.js';
 import { createFireflies } from '../render/fireflies.js';
 import { createMeteor } from '../render/meteor.js';
 import { nightnessFromDim } from './ambient-audio.js';
+import { seasonCached } from '../core/season.js';
 
 /**
  * 夜空(2026-10-03):萤火虫 + 流星 —— 夜里的"画面自己发生的事"。
@@ -22,6 +23,7 @@ export function createNightSky({ config, viewport, environment, spawnRipple }) {
     });
     let on = true;
     let amt = 0;                         // 平滑后的夜度(2s 内跟上)
+    const season = seasonCached();       // 萤火虫的季节活性(夏夜最盛,冬夜几乎无)
 
     return {
         settleWhileDisabled: true,       // 关掉也要把萤火虫淡完,别冻在半空
@@ -29,17 +31,19 @@ export function createNightSky({ config, viewport, environment, spawnRipple }) {
         update(dt) {
             const target = on ? nightnessFromDim((environment.dayPhase && environment.dayPhase.dim) || 0) : 0;
             amt += (target - amt) * Math.min(1, dt / 2);
-            flies.update(dt, amt);
+            const ffAmt = Math.min(1.3, amt * season().firefly);   // 季节活性:只多给夏夜,不放大到爆
+            flies.update(dt, ffAmt);
             meteor.update(dt, amt);
         },
         layers: {
             weather: g => {
-                flies.draw(g, amt);
+                const ffAmt = Math.min(1.3, amt * season().firefly);
+                flies.draw(g, ffAmt);
                 meteor.draw(g);
             }
         },
         setEnabled(next) { on = !!next; },
         dispose() { meteor.clear(); },
-        inspect: () => ({ night: +amt.toFixed(2), flies: flies.inspect(), meteor: meteor.inspect() })
+        inspect: () => ({ night: +amt.toFixed(2), season: season(), flies: flies.inspect(), meteor: meteor.inspect() })
     };
 }

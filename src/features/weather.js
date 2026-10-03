@@ -3,6 +3,7 @@ import { createRainStreaks } from '../render/rain-streaks.js';
 import { createSnowflakes } from '../render/snowflakes.js';
 import { createFog } from '../render/fog.js';
 import { createFrost } from '../render/frost.js';
+import { createBankSnow } from '../render/bank-snow.js';
 import { THEME } from '../shared/legacy-assets.js';
 
 /* ---- WMO 天气码 → 我们的四档(2026-10-03)----
@@ -57,6 +58,13 @@ export function createWeather({ config, viewport, environment, time }) {
     const frostCfg = (THEME.weather && THEME.weather.snow && THEME.weather.snow.snow && THEME.weather.snow.snow.frost) || {};
     const frost = createFrost({ viewport, frost: frostCfg });
     let frostAmt = 0;
+
+    /* ---- 池边积雪(雪档专属,2026-10-03)----
+     * 雪落在"岸上":floor 层(池底之上、鱼之下)。与霜冻(玻璃/快)不同,
+     * 积雪要【慢】:下雪 45s 慢慢积起来,停雪 150s 慢慢化 —— 时间尺度才像雪。 */
+    const bankCfg = (THEME.weather && THEME.weather.snow && THEME.weather.snow.snow && THEME.weather.snow.snow.bankSnow) || {};
+    const bank = createBankSnow({ viewport, bankSnow: bankCfg });
+    let bankAmt = 0;
 
     /* ---- 闪电(雷暴档专属,2026-10-03)----
      * 8~26s 随机一次,亮→暗的双闪(第二道比第一道弱,真实的闪电经常这么闪)。
@@ -201,6 +209,12 @@ export function createWeather({ config, viewport, environment, time }) {
             frostAmt += Math.max(-frostStep, Math.min(frostStep, frostTarget - frostAmt));
             if (frostAmt < 0.003) frostAmt = 0;
 
+            // ── 池边积雪:积雪 45s / 化雪 150s(时间尺度才像雪,和霜冻的 5s 不同)──
+            // ★ 不能加"小于阈值就归零"的清理:积雪每帧只长 dt/45,起步阶段会被它抹回 0,永远积不起来。
+            const bankTarget = (enabled && environment.snowSpec) ? 1 : 0;
+            if (bankTarget > bankAmt) bankAmt = Math.min(bankTarget, bankAmt + dt / 45);
+            else bankAmt = Math.max(0, bankAmt - dt / 150);
+
             // ── 闪电:雷暴档 8~26s 一次的双闪;离开雷暴档立即熄灭 ──
             if (enabled && environment.isStorm) {
                 lightningTimer -= dt;
@@ -229,6 +243,8 @@ export function createWeather({ config, viewport, environment, time }) {
             if (flakes) { flakes.fill(wantFlakes); flakes.update(dt, wantFlakes); }
         },
         layers: {
+            // 池边积雪:floor 层 = 池底之上、鱼之下 —— 雪在岸上,鱼从雪边游过不被盖住
+            floor: g => { if (bankAmt > 0.003) bank.draw(g, bankAmt); },
             // 雾在最底下(它是"空气"),再雨坑(水面),再雨丝(空气),最后雪片 —— 全在 weather 层
             weather: g => {
                 if (fogR) fogR.draw(g, environment.rainAmount);
@@ -261,8 +277,9 @@ export function createWeather({ config, viewport, environment, time }) {
             if (streaks) streaks.clear();
             if (flakes) flakes.clear();
             frost.dispose();
+            bank.dispose();
         },
-        inspect: () => ({ field, streaks, flakes, fog: fogR, spawned, enabled, builtFor, rotT, frost: frostAmt, flash,
+        inspect: () => ({ field, streaks, flakes, fog: fogR, spawned, enabled, builtFor, rotT, frost: frostAmt, bank: bankAmt, flash,
                           real: { state: realState, resolved: realResolved, mapped: realMapped,
                                   nextInMin: Math.max(0, Math.round((realNextAt - Date.now()) / 60000)) } })
     };
