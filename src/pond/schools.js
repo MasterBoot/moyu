@@ -52,6 +52,9 @@ const MAX_STEER = 1.4;              // 整体上限(murmur 是 maxForce 0.15,按
 // (编队跟随取代了"跟随距离"的做法,这两个常量已不再需要)
 const schools = [];
 let schoolAssignCounter = 0;   // 轮转分配群号,避免随机分配导致 25/15/21 这种不均衡
+/* 天气"心情"的领头鱼速度倍率(2026-10-03,features/fish-mood.js 每帧写入):
+ * 雨天领头鱼带群更欢、雪天整群慵懒。群员的 moodSpeedMul 在 behavior.js 里各自生效。 */
+let moodSpeedMul = 1;
 function buildSchools() {
     schools.length = 0;
     for (let i = 0; i < SCHOOL_COUNT; i++) {
@@ -169,9 +172,9 @@ function updateSchools(dt) {
 
         s.surgePhase = (s.surgePhase || 0) + dt * 0.45;
         const surge = 0.84 + 0.30 * (0.5 + 0.5 * Math.sin(s.surgePhase));
-        s.x += Math.cos(s.heading) * s.speed * surge * dtMult;
-        s.y += Math.sin(s.heading) * s.speed * surge * dtMult;
-        s.curSpeed = s.speed * surge;      // 领头鱼的【实际】速度,群员前馈要用它
+        s.x += Math.cos(s.heading) * s.speed * surge * dtMult * moodSpeedMul;
+        s.y += Math.sin(s.heading) * s.speed * surge * dtMult * moodSpeedMul;
+        s.curSpeed = s.speed * surge * moodSpeedMul;      // 领头鱼的【实际】速度,群员前馈要用它
         // 记录路径历史:按弧长采样,并裁掉太老的点
         if (!s.trail) { s.trail = [{ x: s.x, y: s.y, a: 0 }]; s.arc = 0; }
 
@@ -189,5 +192,5 @@ function updateSchools(dt) {
     }
 }
 
-return { schools, buildSchools, updateSchools, trailPoint, QUEUE_LEN, SOLO_RATIO, SCHOOL_COUNT, SCHOOL_PERCEIVE_K, SCHOOL_PERCEIVE_MIN, SEP_W, ALIGN_W, COH_W, MAX_STEER, nextSchool: () => schoolAssignCounter++ % SCHOOL_COUNT };
+return { schools, buildSchools, updateSchools, setMoodSpeed(m) { moodSpeedMul = m; }, trailPoint, QUEUE_LEN, SOLO_RATIO, SCHOOL_COUNT, SCHOOL_PERCEIVE_K, SCHOOL_PERCEIVE_MIN, SEP_W, ALIGN_W, COH_W, MAX_STEER, nextSchool: () => schoolAssignCounter++ % SCHOOL_COUNT };
 }

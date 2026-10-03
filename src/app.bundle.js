@@ -114,6 +114,7 @@
     const MAX_STEER = 1.4;
     const schools = [];
     let schoolAssignCounter = 0;
+    let moodSpeedMul = 1;
     function buildSchools() {
       schools.length = 0;
       for (let i = 0; i < SCHOOL_COUNT; i++) {
@@ -220,9 +221,9 @@
         s.formHeading += Math.atan2(Math.sin(s.heading - s.formHeading), Math.cos(s.heading - s.formHeading)) * Math.min(1, dt * 1.25);
         s.surgePhase = (s.surgePhase || 0) + dt * 0.45;
         const surge = 0.84 + 0.3 * (0.5 + 0.5 * Math.sin(s.surgePhase));
-        s.x += Math.cos(s.heading) * s.speed * surge * dtMult;
-        s.y += Math.sin(s.heading) * s.speed * surge * dtMult;
-        s.curSpeed = s.speed * surge;
+        s.x += Math.cos(s.heading) * s.speed * surge * dtMult * moodSpeedMul;
+        s.y += Math.sin(s.heading) * s.speed * surge * dtMult * moodSpeedMul;
+        s.curSpeed = s.speed * surge * moodSpeedMul;
         if (!s.trail) {
           s.trail = [{ x: s.x, y: s.y, a: 0 }];
           s.arc = 0;
@@ -240,7 +241,9 @@
         s.y = Math.max(20, Math.min(viewport.height - 20, s.y));
       }
     }
-    return { schools, buildSchools, updateSchools, trailPoint, QUEUE_LEN, SOLO_RATIO, SCHOOL_COUNT, SCHOOL_PERCEIVE_K, SCHOOL_PERCEIVE_MIN, SEP_W, ALIGN_W, COH_W, MAX_STEER, nextSchool: () => schoolAssignCounter++ % SCHOOL_COUNT };
+    return { schools, buildSchools, updateSchools, setMoodSpeed(m) {
+      moodSpeedMul = m;
+    }, trailPoint, QUEUE_LEN, SOLO_RATIO, SCHOOL_COUNT, SCHOOL_PERCEIVE_K, SCHOOL_PERCEIVE_MIN, SEP_W, ALIGN_W, COH_W, MAX_STEER, nextSchool: () => schoolAssignCounter++ % SCHOOL_COUNT };
   }
 
   // src/pond/types.js
@@ -2907,7 +2910,7 @@
           }
         }
       }
-      let effectiveBaseSpeed = this.baseSpeed * config.fishSpeed;
+      let effectiveBaseSpeed = this.baseSpeed * config.fishSpeed * (this.moodSpeedMul || 1);
       const bodyLength = (this.numSegments - 1) * this.segmentSpacing * config.fishSize * this.sizeMul;
       const minimumTurnRadius = bodyLength * this.type.turnRadius;
       const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -3015,6 +3018,11 @@
           const flockWeight = behavior === "food" ? 0.6 : behavior === "flee" ? 0.45 : 1;
           desiredTurnRate += flock.turn * flockWeight;
         }
+      }
+      if (this.moodBandPull && behavior !== "edge" && behavior !== "food" && behavior !== "flee") {
+        const lookX = this.x + Math.cos(this.heading) * 240;
+        const bandHeading = Math.atan2(this.moodBandY - this.y, lookX - this.x);
+        desiredTurnRate += clamp(wrapAngle(bandHeading - this.heading), -0.6, 0.6) * this.moodBandPull * (behavior === "school" ? 0.5 : 1);
       }
       let pivot = false;
       if (wantHeading !== null && behavior !== "school") {
@@ -4597,6 +4605,42 @@
     };
   }
 
+  // src/features/fish-mood.js
+  function createFishMood({ kois, environment, schoolSystem, viewport }) {
+    const W = THEME.weather || {};
+    const order = W.order || ["clear"];
+    const presets = order.map((n) => W[n] && W[n].mood || { speed: 1, band: 0.5, pull: 0.25 });
+    let cur = { speed: 1, band: 0.5, pull: 0.25 };
+    function targetMood() {
+      const i = Math.max(0, Math.min(presets.length - 1, environment.index || 0));
+      const i0 = Math.floor(i), i1 = Math.min(presets.length - 1, i0 + 1), f = i - i0;
+      const a = presets[i0], b = presets[i1];
+      return {
+        speed: a.speed + (b.speed - a.speed) * f,
+        band: a.band + (b.band - a.band) * f,
+        pull: a.pull + (b.pull - a.pull) * f
+      };
+    }
+    return {
+      update(dt) {
+        const t = targetMood();
+        const k = Math.min(1, dt / 2.5);
+        cur.speed += (t.speed - cur.speed) * k;
+        cur.band += (t.band - cur.band) * k;
+        cur.pull += (t.pull - cur.pull) * k;
+        const bandY = viewport.height * cur.band;
+        for (let i = 0; i < kois.length; i++) {
+          const f = kois[i];
+          f.moodSpeedMul = cur.speed;
+          f.moodBandY = bandY;
+          f.moodBandPull = cur.pull;
+        }
+        if (schoolSystem && schoolSystem.setMoodSpeed) schoolSystem.setMoodSpeed(cur.speed);
+      },
+      inspect: () => ({ ...cur, bandY: viewport.height * cur.band })
+    };
+  }
+
   // src/builtins.js
   function registerBuiltins({ creatures, features, context }) {
     const koiKind = createKoiCreature({
@@ -4679,6 +4723,12 @@
     features.register({ id: "dayCycle", title: "\u5149\u968F\u65F6\u95F4\u8D70", create: () => createDayCycle({
       config: context.config,
       environment: context.environment
+    }) });
+    features.register({ id: "fishMood", title: "\u5929\u6C14\u5FC3\u60C5", create: () => createFishMood({
+      kois: context.kois,
+      environment: context.environment,
+      schoolSystem: context.schoolSystem,
+      viewport: context.viewport
     }) });
     features.register({ id: "overlay", title: "\u8986\u76D6\u5C42", create: () => {
       const overlay = createOverlay({ kois: context.kois, mouse: context.mouse });

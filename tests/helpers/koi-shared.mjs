@@ -20,12 +20,17 @@ export function installKoiShared() {
             weather: {
                 order: ['clear', 'rain', 'snow'],
                 transition: 1, rainFade: 1,
-                clear: { causticAlpha: 1, grade: '#ffffff', gradeAlpha: 0, rain: null },
+                /* mood 键(features/fish-mood.js 用):三档都配了;fallback 测试会临时
+                 * 摘掉 snow 的 mood 键,覆盖"预设缺 mood 键回退中性"的路径 */
+                clear: { causticAlpha: 1, grade: '#ffffff', gradeAlpha: 0, rain: null,
+                         mood: { speed: 1, band: 0.4, pull: 0.34 } },
                 rain: {
                     causticAlpha: 0.3, grade: '#95a4ac', gradeAlpha: 0.7,
+                    mood: { speed: 1.12, band: 0.5, pull: 0.22 },
                     rain: { power: [0.1, 0.2], maxLive: 50, streak: { perSec: 100 } }
                 },
-                snow: { causticAlpha: 0.5, grade: '#b9c7ce', gradeAlpha: 0.4, rain: null, snow: { perSec: 50 } }
+                snow: { causticAlpha: 0.5, grade: '#b9c7ce', gradeAlpha: 0.4, rain: null,
+                        snow: { perSec: 50 }, mood: { speed: 0.85, band: 0.66, pull: 0.30 } }
             }
         },
         KOI_SHAPE: {},

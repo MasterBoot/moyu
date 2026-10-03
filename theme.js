@@ -159,7 +159,11 @@ const THEME = {
         transition: 3.5,                         // 过渡时长(秒):"天变阴"不是"啪一下"
         rainFade: 1.1,                           // 雨量的淡入淡出(秒)
         /* grade 走 multiply:值越暗压得越狠,alpha 是"压多少"。clear 必须 alpha 0 */
-        clear:    { causticAlpha: 1.00, grade: '#ffffff', gradeAlpha: 0.00, rain: null },
+        /* mood(2026-10-03):天气对鱼群行为的影响(features/fish-mood.js 按 index 插值)。
+         *   speed = 全池游速倍率;band = 垂直带(画面高的比例,鱼被弱转向力引到这一带);
+         *   pull  = 带内吸引强度。晴天偏上"晒背",雨天更欢,雪天慵懒沉底。 */
+        clear:    { causticAlpha: 1.00, grade: '#ffffff', gradeAlpha: 0.00, rain: null,
+                    mood: { speed: 1.00, band: 0.40, pull: 0.34 } },
         /* 雨滴是"小坑"不是"大环":小、密、整圈可见。
          * arcFloor 0.45 是关键 —— 鼠标涟漪用 0(只亮迎光那一侧,像一道月光弧),
          * 雨滴用 0 会变成一根根"流星尾巴";抬到 0.45 才是四面都亮的小圆坑。 */
@@ -181,7 +185,8 @@ const THEME = {
                              * 30fps 下要按"每帧走多远"定:速度/30 必须小于丝长,否则看起来是一串虚线。
                              * 520~760 ÷ 30 = 每帧 17~25px < 丝长 28~56 ⇒ 连续。60fps 时更宽松。 */
                             streak: { perSec: 200, maxLive: 210, len: [28, 56], speed: [520, 760],
-                                      width: 1.4, slope: [-0.26, -0.26], alpha: [0.14, 0.36] } } },
+                                      width: 1.4, slope: [-0.26, -0.26], alpha: [0.14, 0.36] } },
+                  mood: { speed: 1.12, band: 0.50, pull: 0.22 } },
         /* 大雨(2026-10-03):雨丝/雨坑按比例加密,天更暗、光更弱。
          * 成本:丝 330 + 坑 280 ≈ 610 粒子 × 0.02ms + 基础 6.5ms ≈ 19ms@1080p,
          * 仍在 30fps(33ms)预算内。轮动顺序里它夹在雨和雪之间,过渡是插值的,
@@ -191,7 +196,8 @@ const THEME = {
                              speed: [52, 20], life: [0.70, 0.42], crestAlpha: 0.76,
                              ridgeFrac: 0.50, arcFloor: 0.55, arcJitter: 0.40, troughAlpha: 0,
                              streak: { perSec: 330, maxLive: 330, len: [34, 66], speed: [600, 880],
-                                       width: 1.5, slope: [-0.30, -0.30], alpha: [0.16, 0.40] } } },
+                                       width: 1.5, slope: [-0.30, -0.30], alpha: [0.16, 0.40] } },
+                     mood: { speed: 1.20, band: 0.56, pull: 0.26 } },
         /* 雪(2026-10-03):大小不一的真雪花(六枝晶形贴图按大小选档,见 render/snowflakes.js),
          * 落到自己的水面深度即化(渐隐,不起雨坑)。天色是"亮的阴"——
          * multiply 只能压暗,所以用浅青灰 + 低 alpha 表达"蒙了一层雪光",比雨的天色亮、比晴的天色闷。
@@ -204,7 +210,8 @@ const THEME = {
                              * inset* 是相对【短边】的入深;blob/crystal 是晶斑/枝晶数量;
                              * tint 是冰白偏青的 RGB 串。数量是 1280×800 基准,别一把调太大。 */
                             frost: { seed: 0x5EED, edgeAlpha: 0.42, insetTop: 0.17, insetSide: 0.13,
-                                     blobCount: 220, crystalCount: 70, tint: '225,242,248' } } }
+                                     blobCount: 220, crystalCount: 70, tint: '225,242,248' } },
+                    mood: { speed: 0.85, band: 0.66, pull: 0.30 } }
     },
 
     /* ---------- 自持事件:落叶 / 花瓣(2026-09-26 接入) ----------

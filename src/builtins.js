@@ -15,6 +15,7 @@ import { createOverlay } from './ui/overlay.js';
 import { createWeather } from './features/weather.js';
 import { createIdleDrift } from './features/idle-drift.js';
 import { createDayCycle } from './features/day-cycle.js';
+import { createFishMood } from './features/fish-mood.js';
 
 export function registerBuiltins({ creatures, features, context }) {
     // ── 生物:锦鲤(默认 kind,鱼种不声明 creature 时用它) ──
@@ -80,6 +81,11 @@ export function registerBuiltins({ creatures, features, context }) {
     // ── 玩法:光的时段(光随时间走;写 environment 的时段通道 + 光向,默认开,宿主属性 dayCycle 可关) ──
     features.register({ id: 'dayCycle', title: '光随时间走', create: () => createDayCycle({
         config: context.config, environment: context.environment
+    }) });
+
+    // ── 玩法:天气"心情"(晴晒背/雨更欢/雪沉底;参数在 theme.js 各天气预设的 mood 键) ──
+    features.register({ id: 'fishMood', title: '天气心情', create: () => createFishMood({
+        kois: context.kois, environment: context.environment, schoolSystem: context.schoolSystem, viewport: context.viewport
     }) });
 
     // ── 玩法:名字与入口覆盖层(ui 层) ──

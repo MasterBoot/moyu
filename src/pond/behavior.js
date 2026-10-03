@@ -126,7 +126,8 @@ function update(dt) {
             }
         }
 
-        let effectiveBaseSpeed = this.baseSpeed * config.fishSpeed;
+        // moodSpeedMul:天气"心情"倍率(features/fish-mood.js 每帧写入;雨天更欢、雪天慵懒)
+        let effectiveBaseSpeed = this.baseSpeed * config.fishSpeed * (this.moodSpeedMul || 1);
         const bodyLength = (this.numSegments - 1) * this.segmentSpacing * config.fishSize * this.sizeMul;
         // 锦鲤平时至少以约 2.5 个身长的半径转弯；速度高时才允许收紧弧线。
         const minimumTurnRadius = bodyLength * this.type.turnRadius;
@@ -252,6 +253,16 @@ function update(dt) {
                 const flockWeight = behavior === 'food' ? 0.60 : behavior === 'flee' ? 0.45 : 1.0;
                 desiredTurnRate += flock.turn * flockWeight;
             }
+        }
+
+        // 天气"心情"的垂直带(2026-10-03,features/fish-mood.js 每帧写入):
+        // 晴天鱼偏上"晒背"、雨大略避表层、雪天沉底。取正前方 240px 的探点,
+        // 弱转向到带里 —— 追食/惊逃/避墙时不加(不干扰保命行为),编队时减半(不打散队形)。
+        if (this.moodBandPull && behavior !== 'edge' && behavior !== 'food' && behavior !== 'flee') {
+            const lookX = this.x + Math.cos(this.heading) * 240;
+            const bandHeading = Math.atan2(this.moodBandY - this.y, lookX - this.x);
+            desiredTurnRate += clamp(wrapAngle(bandHeading - this.heading), -0.6, 0.6)
+                             * this.moodBandPull * (behavior === 'school' ? 0.5 : 1);
         }
 
         let pivot = false;
