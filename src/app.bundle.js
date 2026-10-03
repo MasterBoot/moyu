@@ -943,8 +943,21 @@
           const overlap = ra + cb.r - dMin;
           if (overlap <= 0) continue;
           const corr = overlap * relax;
-          const mA = A.sizeMul, mB = B.sizeMul, ms = mA + mB;
-          const wA = mB / ms, wB = mA / ms;
+          const mA = ca && ca.mass || A.sizeMul, mB = cb && cb.mass || B.sizeMul;
+          let wA, wB;
+          if (ca.mass && cb.mass) {
+            wA = 0.5;
+            wB = 0.5;
+          } else if (ca.mass) {
+            wA = 0;
+            wB = 1;
+          } else if (cb.mass) {
+            wA = 1;
+            wB = 0;
+          } else {
+            wA = mB / (mA + mB);
+            wB = mA / (mA + mB);
+          }
           A.translate(nx * corr * wA, ny * corr * wA);
           B.translate(-nx * corr * wB, -ny * corr * wB);
         }
@@ -3301,10 +3314,10 @@
         this.y = viewport.height * (0.3 + Math.random() * 0.4);
         this.heading = Math.random() * Math.PI * 2;
         this.angle = this.heading;
-        this.speed = 0.09 + Math.random() * 0.05;
+        this.speed = 0.13 + Math.random() * 0.06;
         this.depth = 0.42 + Math.random() * 0.18;
         this.sizeMul = 1.4 + Math.random() * 0.5;
-        this.collision = { shape: "circle", r: 20 };
+        this.collision = { shape: "circle", r: 22, mass: 16 };
         this.turnBias = 0;
         this.turnBiasTarget = 0;
         this.turnBiasTimer = 2 + Math.random() * 3;
@@ -3324,12 +3337,12 @@
           const want = Math.atan2(cy - this.y, cx - this.x);
           this.heading += Math.atan2(Math.sin(want - this.heading), Math.cos(want - this.heading)) * Math.min(1, dt * 1.4);
         }
-        const surge = 0.8 + 0.2 * Math.sin(this.paddle * 0.5);
+        const surge = 0.86 + 0.14 * Math.sin(this.paddle * 0.5);
         this.x += Math.cos(this.heading) * this.speed * surge * dtMult;
         this.y += Math.sin(this.heading) * this.speed * surge * dtMult;
         this.x = Math.max(40, Math.min(viewport.width - 40, this.x));
         this.y = Math.max(40, Math.min(viewport.height - 40, this.y));
-        this.paddle += dt * 1.7;
+        this.paddle += dt * 1.1;
         this.angle = this.heading;
       }
       translate(dx, dy) {

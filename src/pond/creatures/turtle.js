@@ -20,10 +20,12 @@ class Turtle {
         this.y = viewport.height * (0.3 + Math.random() * 0.4);
         this.heading = Math.random() * Math.PI * 2;
         this.angle = this.heading;
-        this.speed = 0.09 + Math.random() * 0.05;             // px/frame@60 ≈ 5~8 px/s
+        this.speed = 0.13 + Math.random() * 0.06;             // px/frame@60 ≈ 8~11 px/s,慢但"在爬"
         this.depth = 0.42 + Math.random() * 0.18;
         this.sizeMul = 1.4 + Math.random() * 0.5;
-        this.collision = { shape: 'circle', r: 20 };
+        /* mass = 碰撞体量(远大于鱼的 sizeMul):鱼被推开,乌龟几乎不动 ——
+         * 没有它,80 条鱼每帧从四面推它,位置抖成抽搐 */
+        this.collision = { shape: 'circle', r: 22, mass: 16 };
         this.turnBias = 0;
         this.turnBiasTarget = 0;
         this.turnBiasTimer = 2 + Math.random() * 3;
@@ -48,12 +50,12 @@ class Turtle {
             this.heading += Math.atan2(Math.sin(want - this.heading), Math.cos(want - this.heading)) * Math.min(1, dt * 1.4);
         }
 
-        const surge = 0.8 + 0.2 * Math.sin(this.paddle * 0.5);
+        const surge = 0.86 + 0.14 * Math.sin(this.paddle * 0.5);
         this.x += Math.cos(this.heading) * this.speed * surge * dtMult;
         this.y += Math.sin(this.heading) * this.speed * surge * dtMult;
         this.x = Math.max(40, Math.min(viewport.width - 40, this.x));
         this.y = Math.max(40, Math.min(viewport.height - 40, this.y));
-        this.paddle += dt * 1.7;
+        this.paddle += dt * 1.1;                              // 趴行节奏(原来是急促的 1.7)
         this.angle = this.heading;
     }
 
