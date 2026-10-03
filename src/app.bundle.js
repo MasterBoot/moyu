@@ -4774,9 +4774,9 @@
     const d = Number(dim) || 0;
     return Math.max(0, Math.min(1, (d - 0.15) / 0.35));
   }
-  function rainGainFor(amount, isHeavy) {
+  function rainGainFor(amount) {
     const a = Math.max(0, Number(amount) || 0);
-    return Math.min(1, a * (isHeavy ? 1.35 : 1));
+    return Math.min(1, a);
   }
   function createAmbientAudio({ config, environment }) {
     let enabled = true;
@@ -4920,13 +4920,15 @@
         const night = nightnessFromDim(dim);
         const isHeavy = environment.name === "heavyrain";
         const isStorm = environment.name === "thunder" || environment.isStorm === true;
-        const rain = rainGainFor(environment.rainAmount, isStorm ? true : isHeavy);
+        const rainAudible = environment.rainSpec ? 1 : 0;
+        const rainAud = rainGainFor(environment.rainAmount) * rainAudible;
+        const rainBoost = isStorm ? 1.55 : isHeavy ? 1.45 : 1;
         const t = ctx.currentTime;
         const duck = 1 - night * 0.5;
         master.gain.setTargetAtTime(vol, t, 0.1);
-        nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rain * 0.4), t, 0.2);
-        nodes.rainGain.gain.setTargetAtTime(rain * rain * 0.13 * duck * (isStorm ? 1.1 : 1), t, 0.25);
-        const cricketOn = night > 0.45 && rain < 0.5;
+        nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rainAud * 0.4), t, 0.2);
+        nodes.rainGain.gain.setTargetAtTime(rainAud * rainAud * 0.13 * rainBoost * duck, t, 0.25);
+        const cricketOn = night > 0.45 && rainAud < 0.5;
         for (const v of nodes.voices) {
           v.timer -= dt;
           if (v.timer <= 0) {
@@ -4961,14 +4963,23 @@
           nodes = null;
         }
       },
-      inspect: () => ({
-        ctxState: ctx ? ctx.state : "no-ctx",
-        volume: Number(config.ambientVolume) || 0,
-        night: nightnessFromDim(environment.dayPhase && environment.dayPhase.dim || 0),
-        rain: rainGainFor(environment.rainAmount, environment.name === "heavyrain"),
-        thunderIn: Math.round(thunderTimer),
-        voices: nodes ? nodes.voices.length : 0
-      })
+      inspect: () => {
+        const dim = environment.dayPhase && environment.dayPhase.dim || 0;
+        const rainAudible = environment.rainSpec ? 1 : 0;
+        const rainAud = rainGainFor(environment.rainAmount) * rainAudible;
+        const isStorm = environment.name === "thunder" || environment.isStorm === true;
+        const rainBoost = isStorm ? 1.55 : environment.name === "heavyrain" ? 1.45 : 1;
+        return {
+          ctxState: ctx ? ctx.state : "no-ctx",
+          volume: Number(config.ambientVolume) || 0,
+          night: nightnessFromDim(dim),
+          rainAud,
+          rainBoost,
+          rainGainTarget: +(rainAud * rainAud * 0.13 * rainBoost).toFixed(3),
+          thunderIn: Math.round(thunderTimer),
+          voices: nodes ? nodes.voices.length : 0
+        };
+      }
     };
   }
 

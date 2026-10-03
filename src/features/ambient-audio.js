@@ -21,9 +21,10 @@ export function nightnessFromDim(dim) {
     const d = Number(dim) || 0;
     return Math.max(0, Math.min(1, (d - 0.15) / 0.35));
 }
-export function rainGainFor(amount, isHeavy) {
+/** 听感雨量 0~1(封顶;档位间的"更猛"由增益曲线后的倍率表达,不在这里封) */
+export function rainGainFor(amount) {
     const a = Math.max(0, Number(amount) || 0);
-    return Math.min(1, a * (isHeavy ? 1.35 : 1));
+    return Math.min(1, a);
 }
 
 export function createAmbientAudio({ config, environment }) {
@@ -138,17 +139,25 @@ export function createAmbientAudio({ config, environment }) {
             const dim = (environment.dayPhase && environment.dayPhase.dim) || 0;
             const night = nightnessFromDim(dim);
             const isHeavy = environment.name === 'heavyrain';
-            const isStorm = environment.name === 'thunder' || (environment.isStorm === true);   // 雷暴:雨声最猛 + 排雷
-            const rain = rainGainFor(environment.rainAmount, isStorm ? true : isHeavy);
+            const isStorm = environment.name === 'thunder' || (environment.isStorm === true);
+            /* ★ 听感雨量(2026-10-03 修):
+             *   ① rainAmount 是雨/雪/雾共用的"大气量"通道 —— 雪/雾档它也是 1(雪片和雾
+             *      靠它淡入),直接喂雨声 = 雪天一直在下"雨声"。必须先问当前档有没有雨
+             *      (rainSpec 非空),没有就归零;切档瞬间雨声随 0.25s 时间常数收掉。
+             *   ② 大雨/雷暴的倍率放在【平方曲线之后】,不再被 min(1,…)=1 封顶抹平 ——
+             *      否则大雨和雨的增益一模一样(实测听不出区别)。 */
+            const rainAudible = environment.rainSpec ? 1 : 0;
+            const rainAud = rainGainFor(environment.rainAmount) * rainAudible;
+            const rainBoost = isStorm ? 1.55 : isHeavy ? 1.45 : 1;
             const t = ctx.currentTime;
             const duck = 1 - night * 0.5;                     // 夜里水/雨声让一半给安静
 
             master.gain.setTargetAtTime(vol, t, 0.1);
-            nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rain * 0.4), t, 0.2);
-            nodes.rainGain.gain.setTargetAtTime(rain * rain * 0.13 * duck * (isStorm ? 1.1 : 1), t, 0.25);
+            nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rainAud * 0.4), t, 0.2);
+            nodes.rainGain.gain.setTargetAtTime(rainAud * rainAud * 0.13 * rainBoost * duck, t, 0.25);
 
-            /* 虫鸣:夜够深且雨不大才叫 */
-            const cricketOn = night > 0.45 && rain < 0.5;
+            /* 虫鸣:夜够深且听感雨量不大才叫(雪天安静,虫子也叫) */
+            const cricketOn = night > 0.45 && rainAud < 0.5;
             for (const v of nodes.voices) {
                 v.timer -= dt;
                 if (v.timer <= 0) {
@@ -176,13 +185,21 @@ export function createAmbientAudio({ config, environment }) {
         dispose() {
             if (ctx) { ctx.close().catch(() => {}); ctx = null; master = null; nodes = null; }
         },
-        inspect: () => ({
-            ctxState: ctx ? ctx.state : 'no-ctx',
-            volume: Number(config.ambientVolume) || 0,
-            night: nightnessFromDim((environment.dayPhase && environment.dayPhase.dim) || 0),
-            rain: rainGainFor(environment.rainAmount, environment.name === 'heavyrain'),
-            thunderIn: Math.round(thunderTimer),
-            voices: nodes ? nodes.voices.length : 0
-        })
+        inspect: () => {
+            const dim = (environment.dayPhase && environment.dayPhase.dim) || 0;
+            const rainAudible = environment.rainSpec ? 1 : 0;
+            const rainAud = rainGainFor(environment.rainAmount) * rainAudible;
+            const isStorm = environment.name === 'thunder' || (environment.isStorm === true);
+            const rainBoost = isStorm ? 1.55 : environment.name === 'heavyrain' ? 1.45 : 1;
+            return {
+                ctxState: ctx ? ctx.state : 'no-ctx',
+                volume: Number(config.ambientVolume) || 0,
+                night: nightnessFromDim(dim),
+                rainAud, rainBoost,
+                rainGainTarget: +(rainAud * rainAud * 0.13 * rainBoost).toFixed(3),
+                thunderIn: Math.round(thunderTimer),
+                voices: nodes ? nodes.voices.length : 0
+            };
+        }
     };
 }
