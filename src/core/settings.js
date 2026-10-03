@@ -38,6 +38,9 @@ export const DEFAULT_SETTINGS = {
     dayCycle: true,
     // 帧率上限(0 = 不限)。由宿主推来:WE 走 applyGeneralProperties({fps}),见 core/loop.js 与 platform/properties.js。
     fps: 0,
+    // 环境音量(0~1,0 = 静音)。WebAudio 合成,无音频文件(见 features/ambient-audio.js):
+    // 水声底噪 / 雨声跟雨量 / 夜虫昼鸟(合成)/ 大雨雷声。夜里水雨声自动压半。
+    ambientVolume: 0.5,
     // 夜间暗度倍率(0~1.3,1.0 = 现在这版观感)。夜里太暗是这功能最大的口味分歧点,给一根细旋钮。
     nightDim: 1.0
 };

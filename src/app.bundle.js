@@ -322,6 +322,9 @@
     dayCycle: true,
     // 帧率上限(0 = 不限)。由宿主推来:WE 走 applyGeneralProperties({fps}),见 core/loop.js 与 platform/properties.js。
     fps: 0,
+    // 环境音量(0~1,0 = 静音)。WebAudio 合成,无音频文件(见 features/ambient-audio.js):
+    // 水声底噪 / 雨声跟雨量 / 夜虫昼鸟(合成)/ 大雨雷声。夜里水雨声自动压半。
+    ambientVolume: 0.5,
     // 夜间暗度倍率(0~1.3,1.0 = 现在这版观感)。夜里太暗是这功能最大的口味分歧点,给一根细旋钮。
     nightDim: 1
   };
@@ -2535,7 +2538,7 @@
   }
   function attachProperties(config, syncKois) {
     const previous = window.wallpaperPropertyListener, previousLively = window.livelyPropertyListener;
-    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 3], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60] };
+    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 3], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60], ambientVolume: [0, 1] };
     const applyUserProperties = (properties) => {
       for (const [key, property] of Object.entries(properties || {})) {
         if (!(key in config) || !property || !("value" in property)) continue;
@@ -2585,7 +2588,8 @@
     { key: "weather", type: "select", label: "\u5929\u6C14", options: [{ value: 0, label: "\u6674" }, { value: 1, label: "\u96E8" }, { value: 2, label: "\u5927\u96E8" }, { value: 3, label: "\u96EA" }] },
     { key: "realWeather", type: "bool", label: "\u8DDF\u968F\u5F53\u5730\u771F\u5B9E\u5929\u6C14" },
     { key: "weatherAuto", type: "bool", label: "\u5929\u6C14\u81EA\u52A8\u8F6E\u6362" },
-    { key: "weatherAutoMinutes", type: "range", label: "\u8F6E\u6362\u95F4\u9694(\u5206\u949F)", min: 1, max: 60, step: 1 }
+    { key: "weatherAutoMinutes", type: "range", label: "\u8F6E\u6362\u95F4\u9694(\u5206\u949F)", min: 1, max: 60, step: 1 },
+    { key: "ambientVolume", type: "range", label: "\u73AF\u5883\u97F3\u91CF", min: 0, max: 1, step: 0.01 }
   ];
   var CSS = `
 #koi-settings-gear {
@@ -4641,6 +4645,208 @@
     };
   }
 
+  // src/features/ambient-audio.js
+  function nightnessFromDim(dim) {
+    const d = Number(dim) || 0;
+    return Math.max(0, Math.min(1, (d - 0.15) / 0.35));
+  }
+  function rainGainFor(amount, isHeavy) {
+    const a = Math.max(0, Number(amount) || 0);
+    return Math.min(1, a * (isHeavy ? 1.35 : 1));
+  }
+  function createAmbientAudio({ config, environment }) {
+    let enabled = true;
+    let ctx = null, master = null, nodes = null;
+    let thunderTimer = 15;
+    const rng = mulberry32(658704);
+    function makeNoiseBuffer(c) {
+      const len = c.sampleRate * 2;
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < len; i++) {
+        const w = rng() * 2 - 1;
+        b0 = 0.99886 * b0 + w * 0.0555179;
+        b1 = 0.99332 * b1 + w * 0.0750759;
+        b2 = 0.969 * b2 + w * 0.153852;
+        b3 = 0.8665 * b3 + w * 0.3104856;
+        b4 = 0.55 * b4 + w * 0.5329522;
+        b5 = -0.7616 * b5 - w * 0.016898;
+        const out = (b0 + b1 + b2 + b3 + b4 + b5 + b6) * 0.11;
+        b6 = w * 0.115926;
+        d[i] = Math.max(-1, Math.min(1, out * 2.5));
+      }
+      return buf;
+    }
+    function init() {
+      const AC = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
+      if (!AC) return;
+      try {
+        ctx = new AC();
+      } catch (e) {
+        return;
+      }
+      master = ctx.createGain();
+      master.gain.value = 0;
+      master.connect(ctx.destination);
+      const noise = makeNoiseBuffer(ctx);
+      const waterSrc = ctx.createBufferSource();
+      waterSrc.buffer = noise;
+      waterSrc.loop = true;
+      const waterLP = ctx.createBiquadFilter();
+      waterLP.type = "lowpass";
+      waterLP.frequency.value = 320;
+      waterLP.Q.value = 0.7;
+      const waterGain = ctx.createGain();
+      waterGain.gain.value = 0.045;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.08;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 90;
+      lfo.connect(lfoGain);
+      lfoGain.connect(waterLP.frequency);
+      lfo.start();
+      waterSrc.connect(waterLP);
+      waterLP.connect(waterGain);
+      waterGain.connect(master);
+      waterSrc.start();
+      const rainSrc = ctx.createBufferSource();
+      rainSrc.buffer = noise;
+      rainSrc.loop = true;
+      rainSrc.playbackRate.value = 1.7;
+      const rainHP = ctx.createBiquadFilter();
+      rainHP.type = "highpass";
+      rainHP.frequency.value = 1e3;
+      const rainLP2 = ctx.createBiquadFilter();
+      rainLP2.type = "lowpass";
+      rainLP2.frequency.value = 7e3;
+      const rainGain = ctx.createGain();
+      rainGain.gain.value = 0;
+      rainSrc.connect(rainHP);
+      rainHP.connect(rainLP2);
+      rainLP2.connect(rainGain);
+      rainGain.connect(master);
+      rainSrc.start();
+      const voices = [];
+      for (const [freq, pan] of [[4100, -0.55], [4500, 0.1], [3800, 0.6]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        if (p) {
+          p.pan.value = pan;
+          osc.connect(g);
+          g.connect(p);
+          p.connect(master);
+        } else {
+          osc.connect(g);
+          g.connect(master);
+        }
+        osc.start();
+        voices.push({ gain: g, timer: 0.4 + rng() * 2 });
+      }
+      nodes = { waterGain, rainGain, voices, noise };
+    }
+    function chirp(v, vol) {
+      const t0 = ctx.currentTime + 0.05;
+      const g = v.gain.gain;
+      g.cancelScheduledValues(t0);
+      g.setValueAtTime(0, t0);
+      const pulses = 6 + Math.floor(rng() * 4);
+      for (let j = 0; j < pulses; j++) {
+        const p = t0 + j * 0.045;
+        g.linearRampToValueAtTime(vol, p + 8e-3);
+        g.linearRampToValueAtTime(1e-4, p + 0.032);
+      }
+    }
+    function thunder() {
+      const t0 = ctx.currentTime + 0.1, dur = 2.8;
+      const src = ctx.createBufferSource();
+      src.buffer = nodes.noise;
+      src.loop = true;
+      src.playbackRate.value = 0.35;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(220, t0);
+      lp.frequency.exponentialRampToValueAtTime(55, t0 + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(1e-4, t0);
+      g.gain.exponentialRampToValueAtTime(0.4, t0 + 0.12);
+      g.gain.exponentialRampToValueAtTime(1e-4, t0 + dur);
+      src.connect(lp);
+      lp.connect(g);
+      g.connect(master);
+      src.start(t0);
+      src.stop(t0 + dur + 0.1);
+    }
+    return {
+      update(dt) {
+        if (!enabled) return;
+        if (!ctx) init();
+        if (!ctx) return;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {
+          });
+          return;
+        }
+        const vol = Math.max(0, Math.min(1, Number(config.ambientVolume) || 0));
+        const dim = environment.dayPhase && environment.dayPhase.dim || 0;
+        const night = nightnessFromDim(dim);
+        const isHeavy = environment.name === "heavyrain";
+        const rain = rainGainFor(environment.rainAmount, isHeavy);
+        const t = ctx.currentTime;
+        const duck = 1 - night * 0.5;
+        master.gain.setTargetAtTime(vol, t, 0.1);
+        nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rain * 0.4), t, 0.2);
+        nodes.rainGain.gain.setTargetAtTime(rain * rain * 0.13 * duck, t, 0.25);
+        const cricketOn = night > 0.45 && rain < 0.5;
+        for (const v of nodes.voices) {
+          v.timer -= dt;
+          if (v.timer <= 0) {
+            if (cricketOn) chirp(v, (0.03 + rng() * 0.03) * night);
+            v.timer = cricketOn ? 0.9 + rng() * 1.8 : 1 + rng();
+          }
+        }
+        thunderTimer -= dt;
+        if (isHeavy && thunderTimer <= 0) {
+          thunder();
+          thunderTimer = 12 + rng() * 28;
+        } else if (!isHeavy && thunderTimer < 8) {
+          thunderTimer = 8;
+        }
+      },
+      setEnabled(on) {
+        enabled = !!on;
+        if (!ctx) return;
+        const t = ctx.currentTime;
+        master.gain.setTargetAtTime(enabled ? Math.max(0, Math.min(1, Number(config.ambientVolume) || 0)) : 0, t, 0.3);
+        if (enabled) ctx.resume().catch(() => {
+        });
+        else ctx.suspend().catch(() => {
+        });
+      },
+      dispose() {
+        if (ctx) {
+          ctx.close().catch(() => {
+          });
+          ctx = null;
+          master = null;
+          nodes = null;
+        }
+      },
+      inspect: () => ({
+        ctxState: ctx ? ctx.state : "no-ctx",
+        volume: Number(config.ambientVolume) || 0,
+        night: nightnessFromDim(environment.dayPhase && environment.dayPhase.dim || 0),
+        rain: rainGainFor(environment.rainAmount, environment.name === "heavyrain"),
+        thunderIn: Math.round(thunderTimer),
+        voices: nodes ? nodes.voices.length : 0
+      })
+    };
+  }
+
   // src/builtins.js
   function registerBuiltins({ creatures, features, context }) {
     const koiKind = createKoiCreature({
@@ -4729,6 +4935,10 @@
       environment: context.environment,
       schoolSystem: context.schoolSystem,
       viewport: context.viewport
+    }) });
+    features.register({ id: "audio", title: "\u73AF\u5883\u97F3\u6548", create: () => createAmbientAudio({
+      config: context.config,
+      environment: context.environment
     }) });
     features.register({ id: "overlay", title: "\u8986\u76D6\u5C42", create: () => {
       const overlay = createOverlay({ kois: context.kois, mouse: context.mouse });

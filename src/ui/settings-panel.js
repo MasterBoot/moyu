@@ -35,7 +35,8 @@ const FIELDS = [
 	{ key: 'weather', type: 'select', label: '天气', options: [{ value: 0, label: '晴' }, { value: 1, label: '雨' }, { value: 2, label: '大雨' }, { value: 3, label: '雪' }] },
 	{ key: 'realWeather', type: 'bool', label: '跟随当地真实天气' },
 	{ key: 'weatherAuto', type: 'bool', label: '天气自动轮换' },
-	{ key: 'weatherAutoMinutes', type: 'range', label: '轮换间隔(分钟)', min: 1, max: 60, step: 1 }
+	{ key: 'weatherAutoMinutes', type: 'range', label: '轮换间隔(分钟)', min: 1, max: 60, step: 1 },
+	{ key: 'ambientVolume', type: 'range', label: '环境音量', min: 0, max: 1, step: 0.01 }
 ];
 
 const CSS = `

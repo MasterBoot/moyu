@@ -8,6 +8,7 @@
 		{
 			"en-us" : 
 			{
+				"ui_ambient_volume" : "Ambient Volume",
 				"ui_day_cycle" : "Light Follows Real Time",
 				"ui_enable_caustics" : "Enable Light Caustics",
 				"ui_enable_feeding" : "Enable Feeding on Click",
@@ -30,6 +31,7 @@
 			},
 			"zh-chs" :
 			{
+				"ui_ambient_volume" : "环境音量",
 				"ui_day_cycle" : "光随时间走",
 				"ui_enable_caustics" : "水面的光感",
 				"ui_enable_feeding" : "点击投食",
@@ -222,6 +224,18 @@
 				"text" : "ui_weather_real",
 				"type" : "bool",
 				"value" : true
+			},
+			"ambientVolume" :
+			{
+				"fraction" : true,
+				"index" : 15,
+				"max" : 1,
+				"min" : 0,
+				"order" : 116,
+				"precision" : 2,
+				"text" : "ui_ambient_volume",
+				"type" : "slider",
+				"value" : 0.5
 			}
 		}
 	},
