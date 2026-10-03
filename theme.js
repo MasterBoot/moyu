@@ -154,8 +154,11 @@ const THEME = {
      * ⚠️ GPU 光感路径只吃 alpha(GPU 分支不认图案缩放),所以预设必须靠 alpha + 色罩表达,
      *    不能指望 "把光斑调大/调碎" 这类只有 CPU 路径才有的旋钮。 */
     weather: {
-        order: ['clear', 'rain', 'heavyrain', 'snow'],  // 下标 ↔ 宿主属性值(WPE combo / Lively dropdown 都是数字)
-                                                        // 2026-10-03:补大雨与雪(用户要求),天气支持定时轮动(features/weather.js)
+        /* 新档插在末尾(2026-10-03):雪=3 保持不动 —— 老用户 localStorage/宿主里
+         * 存的数字下标不能悄悄变义。轮动顺序:晴→雨→大雨→雪→雷暴→雾→晴。 */
+        order: ['clear', 'rain', 'heavyrain', 'snow', 'thunder', 'fog'],
+                                                 // 下标 ↔ 宿主属性值(WPE combo / Lively dropdown 都是数字)
+                                                        // 2026-10-03:补大雨/雪/雷暴/雾,天气支持定时轮动(features/weather.js)
         transition: 3.5,                         // 过渡时长(秒):"天变阴"不是"啪一下"
         rainFade: 1.1,                           // 雨量的淡入淡出(秒)
         /* grade 走 multiply:值越暗压得越狠,alpha 是"压多少"。clear 必须 alpha 0 */
@@ -211,7 +214,23 @@ const THEME = {
                              * tint 是冰白偏青的 RGB 串。数量是 1280×800 基准,别一把调太大。 */
                             frost: { seed: 0x5EED, edgeAlpha: 0.42, insetTop: 0.17, insetSide: 0.13,
                                      blobCount: 220, crystalCount: 70, tint: '225,242,248' } },
-                    mood: { speed: 0.85, band: 0.66, pull: 0.30 } }
+                    mood: { speed: 0.85, band: 0.66, pull: 0.30 } },
+        /* 雷暴(2026-10-03):大雨的加强版 —— 雨丝更密更斜,天压到最暗;
+         * lightning: true 让 features/weather.js 排 8~26s 一次的全屏闪电(farTint 层),
+         * 雷声由 features/ambient-audio.js 走同一个档位触发。 */
+        thunder:  { causticAlpha: 0.12, grade: '#5e6d76', gradeAlpha: 0.94, lightning: true,
+                    rain: { power: [0.10, 0.32], maxLive: 300,
+                            speed: [55, 22], life: [0.68, 0.40], crestAlpha: 0.78,
+                            ridgeFrac: 0.50, arcFloor: 0.55, arcJitter: 0.40, troughAlpha: 0,
+                            streak: { perSec: 360, maxLive: 360, len: [36, 70], speed: [640, 920],
+                                      width: 1.6, slope: [-0.34, -0.34], alpha: [0.18, 0.44] } },
+                    mood: { speed: 1.18, band: 0.60, pull: 0.28 } },
+        /* 雾(2026-10-03):清晨薄雾 —— 天色低对比,weather 层 10+ 团缓慢漂移的雾
+         * (render/fog.js),淡入淡出走与雨/雪同一条"大气量"通道(environment.rainAmount)。
+         * 雾没有雨坑/雨丝/雪片,是最便宜的一档。 */
+        fog:      { causticAlpha: 0.55, grade: '#8fa3ad', gradeAlpha: 0.55, rain: null,
+                    fog: { seed: 0xF06, puffs: 12, tint: '214,228,235' },
+                    mood: { speed: 0.95, band: 0.50, pull: 0.20 } }
     },
 
     /* ---------- 自持事件:落叶 / 花瓣(2026-09-26 接入) ----------

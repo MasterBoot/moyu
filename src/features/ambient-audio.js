@@ -138,13 +138,14 @@ export function createAmbientAudio({ config, environment }) {
             const dim = (environment.dayPhase && environment.dayPhase.dim) || 0;
             const night = nightnessFromDim(dim);
             const isHeavy = environment.name === 'heavyrain';
-            const rain = rainGainFor(environment.rainAmount, isHeavy);
+            const isStorm = environment.name === 'thunder' || (environment.isStorm === true);   // 雷暴:雨声最猛 + 排雷
+            const rain = rainGainFor(environment.rainAmount, isStorm ? true : isHeavy);
             const t = ctx.currentTime;
             const duck = 1 - night * 0.5;                     // 夜里水/雨声让一半给安静
 
             master.gain.setTargetAtTime(vol, t, 0.1);
             nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rain * 0.4), t, 0.2);
-            nodes.rainGain.gain.setTargetAtTime(rain * rain * 0.13 * duck, t, 0.25);
+            nodes.rainGain.gain.setTargetAtTime(rain * rain * 0.13 * duck * (isStorm ? 1.1 : 1), t, 0.25);
 
             /* 虫鸣:夜够深且雨不大才叫 */
             const cricketOn = night > 0.45 && rain < 0.5;
@@ -156,12 +157,12 @@ export function createAmbientAudio({ config, environment }) {
                 }
             }
 
-            /* 雷:仅大雨档,12~40s 一次;出雷暴圈后至少歇 8s,别一进来就响 */
+            /* 雷:大雨/雷暴档,12~40s 一次;出圈后至少歇 8s,别一进来就响 */
             thunderTimer -= dt;
-            if (isHeavy && thunderTimer <= 0) {
+            if (isStorm && thunderTimer <= 0) {
                 thunder();
                 thunderTimer = 12 + rng() * 28;
-            } else if (!isHeavy && thunderTimer < 8) {
+            } else if (!isStorm && thunderTimer < 8) {
                 thunderTimer = 8;
             }
         },

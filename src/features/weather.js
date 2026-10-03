@@ -1,6 +1,7 @@
 import { createRainRipples } from '../render/ripples.js';
 import { createRainStreaks } from '../render/rain-streaks.js';
 import { createSnowflakes } from '../render/snowflakes.js';
+import { createFog } from '../render/fog.js';
 import { createFrost } from '../render/frost.js';
 import { THEME } from '../shared/legacy-assets.js';
 
@@ -57,6 +58,12 @@ export function createWeather({ config, viewport, environment, time }) {
     const frost = createFrost({ viewport, frost: frostCfg });
     let frostAmt = 0;
 
+    /* ---- 闪电(雷暴档专属,2026-10-03)----
+     * 8~26s 随机一次,亮→暗的双闪(第二道比第一道弱,真实的闪电经常这么闪)。
+     * 画在 farTint 层、screen 加亮 —— 雷声(audio 玩法)与闪电各自独立计时:
+     * 真实的雷本来就和闪电不同步,这样反而自然。 */
+    let flash = 0, flashSecond = false, lightningTimer = 10;
+
     /* ---- 真实天气(2026-10-03)----
      * config.realWeather 默认开:启动时经 IP 定位(免权限弹窗,三个免 key 源依次兜底)
      * 拿经纬度,再查 Open-Meteo(免 key)的当前天气,映射到我们的四档后写 config.weather。
@@ -103,7 +110,9 @@ export function createWeather({ config, viewport, environment, time }) {
         const cur = j && j.current;
         const idx = mapWeatherCode(cur && cur.weather_code, Number(cur && cur.precipitation));
         realMapped = idx;
-        if (enabled) config.weather = idx;      // 真实天气接管(下面的同步块驱动落档)
+        /* 落地时【再查一次】realWeather:fetch 在天上的几秒里,用户可能已经在面板
+         * 关掉了"跟随真实天气"或手动选了天气 —— 迟到的结果不能盖掉他的选择。 */
+        if (enabled && config.realWeather) config.weather = idx;
     }
     function syncRealWeather() {
         realState = 'loading';
@@ -124,7 +133,7 @@ export function createWeather({ config, viewport, environment, time }) {
         });
     }
 
-    let field = null, streaks = null, flakes = null;
+    let field = null, streaks = null, flakes = null, fogR = null;
     let builtFor = -1;                   // 粒子系统是为哪个目标下标配的
 
     function ensureSystems() {
@@ -135,9 +144,11 @@ export function createWeather({ config, viewport, environment, time }) {
         if (flakes) flakes.clear();
         const rain = environment.rainSpec;
         const snow = environment.snowSpec;
+        const fog = environment.fogSpec;
         field = rain ? createRainRipples({ viewport, config, profile: { ...T, ...rain } }) : null;
         streaks = createRainStreaks({ viewport, streak: (rain && rain.streak) || {}, rng: environment.rng });
         flakes = createSnowflakes({ viewport, snow: snow || {}, rng: environment.rng });
+        fogR = fog ? createFog({ viewport, fog }) : null;
     }
 
     /** 雨丝撞到水面 → 原地起一个坑(半径/寿命由雨滴剖面决定) */
@@ -190,6 +201,23 @@ export function createWeather({ config, viewport, environment, time }) {
             frostAmt += Math.max(-frostStep, Math.min(frostStep, frostTarget - frostAmt));
             if (frostAmt < 0.003) frostAmt = 0;
 
+            // ── 闪电:雷暴档 8~26s 一次的双闪;离开雷暴档立即熄灭 ──
+            if (enabled && environment.isStorm) {
+                lightningTimer -= dt;
+                if (lightningTimer <= 0) {
+                    flash = 0.62; flashSecond = false;
+                    lightningTimer = 8 + environment.rng() * 18;
+                }
+            } else if (flash > 0) {
+                flash = 0;   // 切档瞬间熄,不留残光
+            }
+            if (flash > 0) {
+                flash -= dt * 3.2;
+                if (!flashSecond && flash <= 0.36) { flashSecond = true; flash = 0.45; }   // 回闪更弱
+                if (flash < 0) flash = 0;
+            }
+            if (fogR) fogR.update(dt);
+
             // 雨丝/雪片的"在场数量"由环境给(晴=0 ⇒ 落完就退休);关掉玩法时连水坑也不再生成
             const wantStreaks = (enabled && field) ? environment.rainSpawnCount() : 0;
             if (streaks) {
@@ -201,11 +229,24 @@ export function createWeather({ config, viewport, environment, time }) {
             if (flakes) { flakes.fill(wantFlakes); flakes.update(dt, wantFlakes); }
         },
         layers: {
-            // 先雨坑(水面),再雨丝(空气),最后雪片 —— 全在 weather 层,层表一个字没改
+            // 雾在最底下(它是"空气"),再雨坑(水面),再雨丝(空气),最后雪片 —— 全在 weather 层
             weather: g => {
+                if (fogR) fogR.draw(g, environment.rainAmount);
                 if (field) field.draw(g);
                 if (streaks) streaks.draw(g);
                 if (flakes) flakes.draw(g);
+            },
+            // 闪电画在 farTint 层(天色那一层):screen 加亮整幅 —— 在雨丝/涟漪之下,
+            // 所以闪电照亮"天",雨还是黑的剪影,层次才对
+            farTint: g => {
+                if (flash > 0.003) {
+                    g.save();
+                    g.globalCompositeOperation = 'screen';
+                    g.globalAlpha = flash;
+                    g.fillStyle = '#cfe4ff';
+                    g.fillRect(0, 0, viewport.width, viewport.height);
+                    g.restore();
+                }
             },
             // 霜冻画在 ui 层(最上面):它是"结在玻璃上"的,压在鱼/涟漪/粒子之上,鱼名字之下
             ui: g => { if (frostAmt > 0) frost.draw(g, frostAmt, time); }
@@ -221,7 +262,7 @@ export function createWeather({ config, viewport, environment, time }) {
             if (flakes) flakes.clear();
             frost.dispose();
         },
-        inspect: () => ({ field, streaks, flakes, spawned, enabled, builtFor, rotT, frost: frostAmt,
+        inspect: () => ({ field, streaks, flakes, fog: fogR, spawned, enabled, builtFor, rotT, frost: frostAmt, flash,
                           real: { state: realState, resolved: realResolved, mapped: realMapped,
                                   nextInMin: Math.max(0, Math.round((realNextAt - Date.now()) / 60000)) } })
     };

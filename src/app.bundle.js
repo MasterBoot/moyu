@@ -507,7 +507,7 @@
     }
     let index = Number(config == null ? void 0 : config.weather) || 0;
     let target = index;
-    let rainAmount = presetOf(target).rain || presetOf(target).snow ? 1 : 0;
+    let rainAmount = presetOf(target).rain || presetOf(target).snow || presetOf(target).fog ? 1 : 0;
     let clock = 0;
     const rng = mulberry32(seed);
     const range = (a, b) => a + rng() * (b - a);
@@ -532,7 +532,7 @@
       const step = dt / Math.max(1e-3, trans);
       if (index < target) index = Math.min(target, index + step);
       else if (index > target) index = Math.max(target, index - step);
-      const wantPrecip = presetOf(target).rain || presetOf(target).snow ? 1 : 0;
+      const wantPrecip = presetOf(target).rain || presetOf(target).snow || presetOf(target).fog ? 1 : 0;
       const rStep = dt / Math.max(1e-3, (_b = T.rainFade) != null ? _b : 1.1);
       if (rainAmount < wantPrecip) rainAmount = Math.min(wantPrecip, rainAmount + rStep);
       else if (rainAmount > wantPrecip) rainAmount = Math.max(wantPrecip, rainAmount - rStep);
@@ -588,6 +588,14 @@
       /** 目标预设里的雪片参数(非雪档为 null) */
       get snowSpec() {
         return presetOf(target).snow || null;
+      },
+      /** 目标预设里的雾参数(非雾档为 null) */
+      get fogSpec() {
+        return presetOf(target).fog || null;
+      },
+      /** 雷暴档(lightning: true)→ weather 玩法排全屏闪电 */
+      get isStorm() {
+        return !!presetOf(target).lightning;
       },
       /** 预设总数(定时轮动用来取模) */
       get orderLength() {
@@ -2538,7 +2546,7 @@
   }
   function attachProperties(config, syncKois) {
     const previous = window.wallpaperPropertyListener, previousLively = window.livelyPropertyListener;
-    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 3], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60], ambientVolume: [0, 1] };
+    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 5], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60], ambientVolume: [0, 1] };
     const applyUserProperties = (properties) => {
       for (const [key, property] of Object.entries(properties || {})) {
         if (!(key in config) || !property || !("value" in property)) continue;
@@ -2585,7 +2593,7 @@
     { key: "fishSpeed", type: "range", label: "\u6E38\u52A8\u901F\u5EA6\u500D\u7387", min: 0.5, max: 3, step: 0.01 },
     { key: "waterHue", type: "range", label: "\u6C34\u8272\u8272\u76F8", min: 0, max: 360, step: 1 },
     { key: "rippleStrength", type: "range", label: "\u6D9F\u6F2A\u5F3A\u5EA6", min: 0.1, max: 5, step: 0.01 },
-    { key: "weather", type: "select", label: "\u5929\u6C14", options: [{ value: 0, label: "\u6674" }, { value: 1, label: "\u96E8" }, { value: 2, label: "\u5927\u96E8" }, { value: 3, label: "\u96EA" }] },
+    { key: "weather", type: "select", label: "\u5929\u6C14", options: [{ value: 0, label: "\u6674" }, { value: 1, label: "\u96E8" }, { value: 2, label: "\u5927\u96E8" }, { value: 3, label: "\u96EA" }, { value: 4, label: "\u96F7\u66B4" }, { value: 5, label: "\u96FE" }] },
     { key: "realWeather", type: "bool", label: "\u8DDF\u968F\u5F53\u5730\u771F\u5B9E\u5929\u6C14" },
     { key: "weatherAuto", type: "bool", label: "\u5929\u6C14\u81EA\u52A8\u8F6E\u6362" },
     { key: "weatherAutoMinutes", type: "range", label: "\u8F6E\u6362\u95F4\u9694(\u5206\u949F)", min: 1, max: 60, step: 1 },
@@ -3866,6 +3874,85 @@
     };
   }
 
+  // src/render/fog.js
+  function createFog({ viewport, fog = {} }) {
+    var _a;
+    const rng = mulberry32((_a = fog.seed) != null ? _a : 3846);
+    const count = Math.max(1, fog.puffs || 12);
+    const tint = fog.tint || "214,228,235";
+    let sprite = null;
+    function bake() {
+      if (sprite || typeof document === "undefined") return sprite;
+      const S = 256;
+      const c = document.createElement("canvas");
+      c.width = c.height = S;
+      const g = c.getContext("2d");
+      const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+      gr.addColorStop(0, "rgba(" + tint + ",0.9)");
+      gr.addColorStop(0.45, "rgba(" + tint + ",0.42)");
+      gr.addColorStop(1, "rgba(" + tint + ",0)");
+      g.fillStyle = gr;
+      g.fillRect(0, 0, S, S);
+      sprite = c;
+      return sprite;
+    }
+    const puffs = [];
+    for (let i = 0; i < count; i++) {
+      puffs.push({
+        x: rng() * 1.4 - 0.2,
+        // 画宽的比例(允许出界 20%)
+        y: rng() * 0.9 - 0.05,
+        // 画高的比例
+        s: 0.3 + rng() * 0.4,
+        // 团直径 = 短边的比例
+        vx: (4 + rng() * 10) * (rng() < 0.5 ? -1 : 1),
+        // px/s,横向漂移
+        vy: -(0.6 + rng() * 1.6),
+        // 极缓上浮
+        a: 0.06 + rng() * 0.07,
+        ph: rng() * Math.PI * 2
+      });
+    }
+    return {
+      get count() {
+        return count;
+      },
+      update(dt) {
+        for (const p of puffs) {
+          p.x += p.vx * dt / Math.max(1, viewport.width);
+          p.y += p.vy * dt / Math.max(1, viewport.height);
+          p.ph += dt * 0.15;
+          if (p.x < -0.35) p.x += 1.7;
+          else if (p.x > 1.35) p.x -= 1.7;
+          if (p.y < -0.45) p.y += 1;
+          else if (p.y > 0.55) p.y -= 1;
+        }
+      },
+      /** amount = 大气量 0~1(雾档的淡入淡出) */
+      draw(g, amount) {
+        const sp = bake();
+        if (!sp) return;
+        if (amount <= 3e-3) return;
+        const w = Math.max(2, viewport.width), h = Math.max(2, viewport.height);
+        const short = Math.min(w, h);
+        const wasOp = g.globalCompositeOperation, wasA = g.globalAlpha;
+        g.globalCompositeOperation = "screen";
+        for (let i = 0; i < puffs.length; i++) {
+          const p = puffs[i];
+          const a = p.a * amount * (0.75 + 0.25 * Math.sin(p.ph));
+          const d = p.s * short;
+          g.globalAlpha = Math.max(0, Math.min(1, a));
+          g.drawImage(sp, p.x * w - d / 2, p.y * h - d / 2, d, d);
+        }
+        g.globalAlpha = wasA;
+        g.globalCompositeOperation = wasOp;
+      },
+      clear() {
+      },
+      inspect: () => ({ count, sprite: !!sprite })
+    };
+  }
+
   // src/render/frost.js
   function createFrost({ viewport, frost = {} }) {
     var _a, _b, _c, _d, _e, _f;
@@ -3986,6 +4073,7 @@
     const frostCfg = THEME.weather && THEME.weather.snow && THEME.weather.snow.snow && THEME.weather.snow.snow.frost || {};
     const frost = createFrost({ viewport, frost: frostCfg });
     let frostAmt = 0;
+    let flash = 0, flashSecond = false, lightningTimer = 10;
     const REAL_REFRESH = 30 * 60 * 1e3;
     const FETCH_TIMEOUT = 8e3;
     let realState = "idle";
@@ -4028,7 +4116,7 @@
       const cur = j && j.current;
       const idx = mapWeatherCode(cur && cur.weather_code, Number(cur && cur.precipitation));
       realMapped = idx;
-      if (enabled) config.weather = idx;
+      if (enabled && config.realWeather) config.weather = idx;
     }
     function syncRealWeather() {
       realState = "loading";
@@ -4047,7 +4135,7 @@
         }
       });
     }
-    let field = null, streaks = null, flakes = null;
+    let field = null, streaks = null, flakes = null, fogR = null;
     let builtFor = -1;
     function ensureSystems() {
       if (environment.targetIndex === builtFor) return;
@@ -4057,9 +4145,11 @@
       if (flakes) flakes.clear();
       const rain = environment.rainSpec;
       const snow = environment.snowSpec;
+      const fog = environment.fogSpec;
       field = rain ? createRainRipples({ viewport, config, profile: { ...T, ...rain } }) : null;
       streaks = createRainStreaks({ viewport, streak: rain && rain.streak || {}, rng: environment.rng });
       flakes = createSnowflakes({ viewport, snow: snow || {}, rng: environment.rng });
+      fogR = fog ? createFog({ viewport, fog }) : null;
     }
     function onImpact(x, y) {
       const p = environment.rainSpec && environment.rainSpec.power || [0.1, 0.25];
@@ -4101,6 +4191,25 @@
         const frostStep = dt / 5;
         frostAmt += Math.max(-frostStep, Math.min(frostStep, frostTarget - frostAmt));
         if (frostAmt < 3e-3) frostAmt = 0;
+        if (enabled && environment.isStorm) {
+          lightningTimer -= dt;
+          if (lightningTimer <= 0) {
+            flash = 0.62;
+            flashSecond = false;
+            lightningTimer = 8 + environment.rng() * 18;
+          }
+        } else if (flash > 0) {
+          flash = 0;
+        }
+        if (flash > 0) {
+          flash -= dt * 3.2;
+          if (!flashSecond && flash <= 0.36) {
+            flashSecond = true;
+            flash = 0.45;
+          }
+          if (flash < 0) flash = 0;
+        }
+        if (fogR) fogR.update(dt);
         const wantStreaks = enabled && field ? environment.rainSpawnCount() : 0;
         if (streaks) {
           streaks.fill(wantStreaks);
@@ -4114,11 +4223,24 @@
         }
       },
       layers: {
-        // 先雨坑(水面),再雨丝(空气),最后雪片 —— 全在 weather 层,层表一个字没改
+        // 雾在最底下(它是"空气"),再雨坑(水面),再雨丝(空气),最后雪片 —— 全在 weather 层
         weather: (g) => {
+          if (fogR) fogR.draw(g, environment.rainAmount);
           if (field) field.draw(g);
           if (streaks) streaks.draw(g);
           if (flakes) flakes.draw(g);
+        },
+        // 闪电画在 farTint 层(天色那一层):screen 加亮整幅 —— 在雨丝/涟漪之下,
+        // 所以闪电照亮"天",雨还是黑的剪影,层次才对
+        farTint: (g) => {
+          if (flash > 3e-3) {
+            g.save();
+            g.globalCompositeOperation = "screen";
+            g.globalAlpha = flash;
+            g.fillStyle = "#cfe4ff";
+            g.fillRect(0, 0, viewport.width, viewport.height);
+            g.restore();
+          }
         },
         // 霜冻画在 ui 层(最上面):它是"结在玻璃上"的,压在鱼/涟漪/粒子之上,鱼名字之下
         ui: (g) => {
@@ -4139,11 +4261,13 @@
         field,
         streaks,
         flakes,
+        fog: fogR,
         spawned,
         enabled,
         builtFor,
         rotT,
         frost: frostAmt,
+        flash,
         real: {
           state: realState,
           resolved: realResolved,
@@ -4795,12 +4919,13 @@
         const dim = environment.dayPhase && environment.dayPhase.dim || 0;
         const night = nightnessFromDim(dim);
         const isHeavy = environment.name === "heavyrain";
-        const rain = rainGainFor(environment.rainAmount, isHeavy);
+        const isStorm = environment.name === "thunder" || environment.isStorm === true;
+        const rain = rainGainFor(environment.rainAmount, isStorm ? true : isHeavy);
         const t = ctx.currentTime;
         const duck = 1 - night * 0.5;
         master.gain.setTargetAtTime(vol, t, 0.1);
         nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rain * 0.4), t, 0.2);
-        nodes.rainGain.gain.setTargetAtTime(rain * rain * 0.13 * duck, t, 0.25);
+        nodes.rainGain.gain.setTargetAtTime(rain * rain * 0.13 * duck * (isStorm ? 1.1 : 1), t, 0.25);
         const cricketOn = night > 0.45 && rain < 0.5;
         for (const v of nodes.voices) {
           v.timer -= dt;
@@ -4810,10 +4935,10 @@
           }
         }
         thunderTimer -= dt;
-        if (isHeavy && thunderTimer <= 0) {
+        if (isStorm && thunderTimer <= 0) {
           thunder();
           thunderTimer = 12 + rng() * 28;
-        } else if (!isHeavy && thunderTimer < 8) {
+        } else if (!isStorm && thunderTimer < 8) {
           thunderTimer = 8;
         }
       },

@@ -12,7 +12,7 @@ export function attachProperties(config, syncKois) {
     /* 范围与 project.json 的声明对齐(2026-10-03)。原来这里比声明宽(fishCount [0,300]
      * vs 10-200 等),localStorage/软件面板这条路能写进 UI 不允许的值 ——
      * 比如 0 条鱼的空池塘(core/settings.js 注释里防的就是它)。 */
-    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 3], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60], ambientVolume: [0, 1] };
+    const numeric = { fishCount: [10, 200], fishSpeed: [0.5, 3], fishSize: [0.5, 3], rippleStrength: [0.1, 5], waterHue: [0, 360], weather: [0, 5], nightDim: [0, 1.3], weatherAutoMinutes: [1, 60], ambientVolume: [0, 1] };
     const applyUserProperties = properties => {
         for (const [key, property] of Object.entries(properties || {})) {
             if (!(key in config) || !property || !('value' in property)) continue;

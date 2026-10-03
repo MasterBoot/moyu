@@ -43,9 +43,9 @@ export function createEnvironment({ config, transition, seed = 0x9e3779b9 } = {}
     let index = Number(config?.weather) || 0;      // 当前(过渡中的)位置,可以是小数
     let target = index;                            // 目标下标(整数)
     /* 降水量 0~1(自己一条淡入淡出曲线)。名字沿用了 rainAmount,但 2026-10-03 起
-     * 它是雨/雪共用的"降水通道":带 rain 或 snow 的预设都会把它推到 1 ——
-     * 否则雪档(rain: null)的雨量永远停在 0,雪一片都出不来。 */
-    let rainAmount = (presetOf(target).rain || presetOf(target).snow) ? 1 : 0;
+     * 它是雨/雪/雾共用的"大气量"通道:带 rain、snow 或 fog 的预设都会把它推到 1 ——
+     * 否则雪档(rain: null)的雨量永远停在 0,雪一片都出不来;雾同理。 */
+    let rainAmount = (presetOf(target).rain || presetOf(target).snow || presetOf(target).fog) ? 1 : 0;
     let clock = 0;
 
     /* 独立随机流:复用 shared/math 的 mulberry32 + 固定种子 → 雨点分布可复现 */
@@ -78,7 +78,7 @@ export function createEnvironment({ config, transition, seed = 0x9e3779b9 } = {}
         const step = dt / Math.max(0.001, trans);
         if (index < target) index = Math.min(target, index + step);
         else if (index > target) index = Math.max(target, index - step);
-        const wantPrecip = (presetOf(target).rain || presetOf(target).snow) ? 1 : 0;
+        const wantPrecip = (presetOf(target).rain || presetOf(target).snow || presetOf(target).fog) ? 1 : 0;
         const rStep = dt / Math.max(0.001, T.rainFade ?? 1.1);
         if (rainAmount < wantPrecip) rainAmount = Math.min(wantPrecip, rainAmount + rStep);
         else if (rainAmount > wantPrecip) rainAmount = Math.max(wantPrecip, rainAmount - rStep);
@@ -142,6 +142,10 @@ export function createEnvironment({ config, transition, seed = 0x9e3779b9 } = {}
         get rainSpec() { return presetOf(target).rain || null; },
         /** 目标预设里的雪片参数(非雪档为 null) */
         get snowSpec() { return presetOf(target).snow || null; },
+        /** 目标预设里的雾参数(非雾档为 null) */
+        get fogSpec() { return presetOf(target).fog || null; },
+        /** 雷暴档(lightning: true)→ weather 玩法排全屏闪电 */
+        get isStorm() { return !!presetOf(target).lightning; },
         /** 预设总数(定时轮动用来取模) */
         get orderLength() { return order.length; },
         get settled() { return Math.abs(index - target) < 1e-3; },

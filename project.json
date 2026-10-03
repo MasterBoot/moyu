@@ -24,10 +24,12 @@
 				"ui_weather_auto" : "Auto Weather Cycle",
 				"ui_weather_auto_minutes" : "Cycle Interval (min)",
 				"ui_weather_clear" : "Clear",
+				"ui_weather_fog" : "Fog",
 				"ui_weather_heavyrain" : "Heavy Rain",
 				"ui_weather_rain" : "Rain",
 				"ui_weather_real" : "Match Real Local Weather",
-				"ui_weather_snow" : "Snow"
+				"ui_weather_snow" : "Snow",
+				"ui_weather_thunder" : "Thunderstorm"
 			},
 			"zh-chs" :
 			{
@@ -47,10 +49,12 @@
 				"ui_weather_auto" : "天气自动轮换",
 				"ui_weather_auto_minutes" : "轮换间隔(分钟)",
 				"ui_weather_clear" : "晴",
+				"ui_weather_fog" : "雾",
 				"ui_weather_heavyrain" : "大雨",
 				"ui_weather_rain" : "雨",
 				"ui_weather_real" : "跟随当地真实天气",
-				"ui_weather_snow" : "雪"
+				"ui_weather_snow" : "雪",
+				"ui_weather_thunder" : "雷暴"
 			}
 		},
 		"properties" : 
@@ -190,6 +194,14 @@
 					{
 						"label" : "ui_weather_snow",
 						"value" : 3
+					},
+					{
+						"label" : "ui_weather_thunder",
+						"value" : 4
+					},
+					{
+						"label" : "ui_weather_fog",
+						"value" : 5
 					}
 				],
 				"order" : 108,

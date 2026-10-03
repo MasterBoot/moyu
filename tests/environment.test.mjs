@@ -84,3 +84,31 @@ test('snapTo:立即落档,不走过渡(启动等真实天气用)', () => {
     assert.equal(env.index, 1);
     assert.equal(env.name, 'rain');
 });
+
+test('雾/雷暴:大气量通道、fogSpec/isStorm 访问器', () => {
+    const env = makeEnv();
+    const weather = globalThis.KoiShared.THEME.weather;
+    weather.order.push('fog', 'thunder');
+    weather.fog = { causticAlpha: 0.55, grade: '#8fa3ad', gradeAlpha: 0.5, rain: null, fog: { puffs: 10 } };
+    weather.thunder = { causticAlpha: 0.12, grade: '#5e6d76', gradeAlpha: 0.9, lightning: true,
+                        rain: { power: [0.1, 0.2], maxLive: 50, streak: { perSec: 300 } } };
+    try {
+        assert.equal(env.orderLength, 5);
+        env.setWeather(3);                                  // 雾(追加后下标 3)
+        for (let i = 0; i < 400; i++) env.update(0.05);
+        assert.equal(env.fogSpec.puffs, 10);
+        assert.ok(env.rainAmount > 0.9, '雾也算大气量,rainAmount=' + env.rainAmount);
+        assert.equal(env.rainSpawnCount(), 0);              // 雾没有雨丝
+        assert.equal(env.snowSpawnCount(), 0);
+        assert.ok(!env.isStorm);
+        env.setWeather(4);                                  // 雷暴
+        for (let i = 0; i < 400; i++) env.update(0.05);
+        assert.ok(env.isStorm);
+        assert.equal(env.rainSpawnCount(), 300);            // 雷暴带雨丝
+        assert.equal(env.fogSpec, null);
+    } finally {
+        weather.order.length = 3;
+        delete weather.fog;
+        delete weather.thunder;
+    }
+});
