@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS = {
     // 帧率上限(0 = 不限)。由宿主推来:WE 走 applyGeneralProperties({fps}),见 core/loop.js 与 platform/properties.js。
     fps: 0,
     // 环境音量(0~1,0 = 静音)。WebAudio 合成,无音频文件(见 features/ambient-audio.js):
-    // 水声底噪 / 雨声跟雨量 / 夜虫昼鸟(合成)/ 大雨雷声。夜里水雨声自动压半。
+    // 水声底噪 / 雨声跟雨量 / 大雨雷声。夜里水雨声自动压半。
     ambientVolume: 0.5,
     // 纯净模式(2026-10-03):隐藏时钟与鱼名等一切 UI,齿轮变暗但可点(悬停恢复),
     // 截图/录屏党用。config 是唯一真源,时钟/覆盖层每帧读它(builtins.js)。

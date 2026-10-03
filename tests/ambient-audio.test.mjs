@@ -30,7 +30,6 @@ test('无 DOM 环境:update 是安全空跑', () => {
     f.update(0.016);
     const ins = f.inspect();
     assert.equal(ins.ctxState, 'no-ctx');
-    assert.equal(ins.voices, 0);
     f.setEnabled(false);       // 没 ctx 时也不能炸
     f.dispose();
 });

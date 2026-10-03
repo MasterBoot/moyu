@@ -8,6 +8,7 @@
 //   layers      往绘制层投稿           interactions  占一个输入模式
 //   update      每帧模拟(碰撞之前)     setEnabled    开关
 import { createKoiCreature } from './pond/creatures/koi-fish.js';
+import { createTurtleCreature } from './pond/creatures/turtle.js';
 import { createClock } from './features/clock.js';
 import { createFeeding } from './features/feeding.js';
 import { createCustomFish } from './features/custom-fish.js';
@@ -18,6 +19,7 @@ import { createDayCycle } from './features/day-cycle.js';
 import { createFishMood } from './features/fish-mood.js';
 import { createAmbientAudio } from './features/ambient-audio.js';
 import { createNightSky } from './features/night-sky.js';
+import { createPondLife } from './features/pond-life.js';
 
 export function registerBuiltins({ creatures, features, context }) {
     // ── 生物:锦鲤(默认 kind,鱼种不声明 creature 时用它) ──
@@ -28,6 +30,20 @@ export function registerBuiltins({ creatures, features, context }) {
         schoolSystem: context.schoolSystem, drawFish: context.drawFish
     });
     creatures.register({ id: 'koi-fish', title: '锦鲤', create: koiKind.create, exports: koiKind });
+
+    // ── 生物:乌龟(第一种非鱼 kind;circle 碰撞,鱼群绕着它走)──
+    // 鱼种(types)只是数据壳:乌龟不追食不编队,数值字段是为过校验的最小占位。
+    context.types.register({
+        id: 'turtle', name: '乌龟', creature: 'turtle',
+        segmentSpacing: 1, speedMultiplier: 0.15, turnRadius: 3, collisionRadius: 0.1
+    });
+    const turtleKind = createTurtleCreature({ viewport: context.viewport });
+    creatures.register({ id: 'turtle', title: '乌龟', create: turtleKind.create, exports: turtleKind });
+    for (let i = 0; i < 2; i++) {
+        const t = creatures.spawn('turtle', { origin: 'spawned' });
+        t.origin = 'spawned';                                  // 种群系统别碰(origin!=='stock' 即可)
+        context.kois.push(t);
+    }
 
     // ── 玩法:时钟(沉在水下的 hud 层;纯净模式时一并隐去,config 每帧现读) ──
     features.register({ id: 'clock', title: '时钟', create: () => {
@@ -99,6 +115,11 @@ export function registerBuiltins({ creatures, features, context }) {
     features.register({ id: 'nightSky', title: '夜空', create: () => createNightSky({
         config: context.config, viewport: context.viewport,
         environment: context.environment, spawnRipple: context.spawnRipple
+    }) });
+
+    // ── 玩法:池塘小住户(蜻蜓点水 + 荷叶青蛙;画在 weather 层,不进碰撞体系) ──
+    features.register({ id: 'pondLife', title: '池塘小住户', create: () => createPondLife({
+        config: context.config, viewport: context.viewport, spawnRipple: context.spawnRipple
     }) });
 
     // ── 玩法:名字与入口覆盖层(ui 层;纯净模式时一并隐去) ──

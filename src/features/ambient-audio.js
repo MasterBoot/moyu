@@ -2,10 +2,9 @@
  *
  *   水声底噪 — 粉噪声循环 → 低通(320Hz ± LFO 起伏)= 缓慢的涟漪感
  *   雨声     — 同一噪声源(加速播放变"沙")→ 高通,音量跟 environment.rainAmount
- *              的平方走(小雨细、大雨猛),大雨档再乘 1.35;水声在雨大时主动让位
- *   夜虫鸣   — 三只合成蛐蛐(不同频率 + 随机声像),夜度(dayPhase.dim)够深才叫,
- *              雨大时闭嘴(听不见也合理);夜间水/雨声自动压到一半
- *   雷声     — 仅大雨档:噪声放慢 + 低通扫频的隆隆,12~40s 随机一次
+ *              的平方走(小雨细、大雨猛),大雨/雷暴档再加成;水声在雨大时主动让位
+ *   雷声     — 仅大雨/雷暴档:噪声放慢 + 低通扫频的隆隆,12~40s 随机一次
+ *   夜间     — 水/雨声自动压到一半(合成虫鸣试过一版,用户嫌吵,已整体移除)
  *
  * 母音量 = config.ambientVolume(设置面板滑杆)。全部节点挂在 master 上,
  * 关玩法(setEnabled(false))时淡出并 suspend,不占 CPU。
@@ -84,33 +83,7 @@ export function createAmbientAudio({ config, environment }) {
         rainSrc.connect(rainHP); rainHP.connect(rainLP2); rainLP2.connect(rainGain); rainGain.connect(master);
         rainSrc.start();
 
-        /* ── 三只合成蛐蛐 ── */
-        const voices = [];
-        for (const [freq, pan] of [[4100, -0.55], [4500, 0.1], [3800, 0.6]]) {
-            const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
-            const g = ctx.createGain(); g.gain.value = 0;
-            const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-            if (p) { p.pan.value = pan; osc.connect(g); g.connect(p); p.connect(master); }
-            else { osc.connect(g); g.connect(master); }
-            osc.start();
-            voices.push({ gain: g, timer: 0.4 + rng() * 2 });
-        }
-
-        nodes = { waterGain, rainGain, voices, noise };
-    }
-
-    /** 一声蛐蛐:一串短脉冲(6~9 个),用 gain 自动化排进音频时间线 */
-    function chirp(v, vol) {
-        const t0 = ctx.currentTime + 0.05;
-        const g = v.gain.gain;
-        g.cancelScheduledValues(t0);
-        g.setValueAtTime(0, t0);
-        const pulses = 6 + Math.floor(rng() * 4);
-        for (let j = 0; j < pulses; j++) {
-            const p = t0 + j * 0.045;
-            g.linearRampToValueAtTime(vol, p + 0.008);
-            g.linearRampToValueAtTime(0.0001, p + 0.032);
-        }
+        nodes = { waterGain, rainGain, noise };
     }
 
     /** 一声雷:噪声放慢(0.35×)→ 低通从 220Hz 扫到 55Hz,快起慢衰 */
@@ -156,16 +129,6 @@ export function createAmbientAudio({ config, environment }) {
             nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rainAud * 0.4), t, 0.2);
             nodes.rainGain.gain.setTargetAtTime(rainAud * rainAud * 0.13 * rainBoost * duck, t, 0.25);
 
-            /* 虫鸣:夜够深且听感雨量不大才叫(雪天安静,虫子也叫) */
-            const cricketOn = night > 0.45 && rainAud < 0.5;
-            for (const v of nodes.voices) {
-                v.timer -= dt;
-                if (v.timer <= 0) {
-                    if (cricketOn) chirp(v, (0.03 + rng() * 0.03) * night);
-                    v.timer = cricketOn ? (0.9 + rng() * 1.8) : (1 + rng());
-                }
-            }
-
             /* 雷:大雨/雷暴档,12~40s 一次;出圈后至少歇 8s,别一进来就响 */
             thunderTimer -= dt;
             if (isStorm && thunderTimer <= 0) {
@@ -197,8 +160,7 @@ export function createAmbientAudio({ config, environment }) {
                 night: nightnessFromDim(dim),
                 rainAud, rainBoost,
                 rainGainTarget: +(rainAud * rainAud * 0.13 * rainBoost).toFixed(3),
-                thunderIn: Math.round(thunderTimer),
-                voices: nodes ? nodes.voices.length : 0
+                thunderIn: Math.round(thunderTimer)
             };
         }
     };

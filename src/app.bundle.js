@@ -323,7 +323,7 @@
     // 帧率上限(0 = 不限)。由宿主推来:WE 走 applyGeneralProperties({fps}),见 core/loop.js 与 platform/properties.js。
     fps: 0,
     // 环境音量(0~1,0 = 静音)。WebAudio 合成,无音频文件(见 features/ambient-audio.js):
-    // 水声底噪 / 雨声跟雨量 / 夜虫昼鸟(合成)/ 大雨雷声。夜里水雨声自动压半。
+    // 水声底噪 / 雨声跟雨量 / 大雨雷声。夜里水雨声自动压半。
     ambientVolume: 0.5,
     // 纯净模式(2026-10-03):隐藏时钟与鱼名等一切 UI,齿轮变暗但可点(悬停恢复),
     // 截图/录屏党用。config 是唯一真源,时钟/覆盖层每帧读它(builtins.js)。
@@ -3291,6 +3291,125 @@
     return { create: (type, opts) => new Koi(type, opts), Koi };
   }
 
+  // src/pond/creatures/turtle.js
+  function createTurtleCreature({ viewport }) {
+    class Turtle {
+      constructor(type, opts = {}) {
+        this.type = type;
+        this.origin = opts.origin || "spawned";
+        this.x = viewport.width * (0.3 + Math.random() * 0.4);
+        this.y = viewport.height * (0.3 + Math.random() * 0.4);
+        this.heading = Math.random() * Math.PI * 2;
+        this.angle = this.heading;
+        this.speed = 0.09 + Math.random() * 0.05;
+        this.depth = 0.42 + Math.random() * 0.18;
+        this.sizeMul = 1.4 + Math.random() * 0.5;
+        this.collision = { shape: "circle", r: 20 };
+        this.turnBias = 0;
+        this.turnBiasTarget = 0;
+        this.turnBiasTimer = 2 + Math.random() * 3;
+        this.paddle = Math.random() * Math.PI * 2;
+      }
+      update(dt) {
+        const dtMult = dt * 60;
+        this.turnBiasTimer -= dt;
+        if (this.turnBiasTimer <= 0) {
+          this.turnBiasTarget = (Math.random() - 0.5) * 0.24;
+          this.turnBiasTimer = 4 + Math.random() * 5;
+        }
+        this.turnBias += (this.turnBiasTarget - this.turnBias) * Math.min(1, dt / 2);
+        this.heading += this.turnBias * dt;
+        const m = 90, cx = viewport.width / 2, cy = viewport.height / 2;
+        if (this.x < m || this.x > viewport.width - m || this.y < m || this.y > viewport.height - m) {
+          const want = Math.atan2(cy - this.y, cx - this.x);
+          this.heading += Math.atan2(Math.sin(want - this.heading), Math.cos(want - this.heading)) * Math.min(1, dt * 1.4);
+        }
+        const surge = 0.8 + 0.2 * Math.sin(this.paddle * 0.5);
+        this.x += Math.cos(this.heading) * this.speed * surge * dtMult;
+        this.y += Math.sin(this.heading) * this.speed * surge * dtMult;
+        this.x = Math.max(40, Math.min(viewport.width - 40, this.x));
+        this.y = Math.max(40, Math.min(viewport.height - 40, this.y));
+        this.paddle += dt * 1.7;
+        this.angle = this.heading;
+      }
+      translate(dx, dy) {
+        this.x += dx;
+        this.y += dy;
+      }
+      draw(g) {
+        const L = 46 * this.sizeMul;
+        const W = L * 0.72;
+        g.save();
+        g.translate(this.x, this.y);
+        g.rotate(this.heading);
+        g.fillStyle = "rgba(10,30,28,0.16)";
+        g.beginPath();
+        g.ellipse(4, 6, L * 0.52, W * 0.52, 0, 0, Math.PI * 2);
+        g.fill();
+        const paddle = Math.sin(this.paddle);
+        g.fillStyle = "#5e7050";
+        for (const sgn of [-1, 1]) {
+          for (const [front, ph] of [[1, paddle], [-1, -paddle * 0.7]]) {
+            g.save();
+            g.translate(front * L * 0.3, sgn * W * 0.44);
+            g.rotate(sgn * (0.7 + ph * 0.35));
+            g.beginPath();
+            g.ellipse(front * L * 0.1, 0, L * 0.15, L * 0.055, 0, 0, Math.PI * 2);
+            g.fill();
+            g.restore();
+          }
+        }
+        g.beginPath();
+        g.moveTo(-L * 0.42, 0);
+        g.lineTo(-L * 0.56, W * 0.08);
+        g.lineTo(-L * 0.56, -W * 0.08);
+        g.closePath();
+        g.fill();
+        const shell = g.createRadialGradient(-L * 0.08, -W * 0.08, L * 0.05, 0, 0, L * 0.5);
+        shell.addColorStop(0, "#5b7442");
+        shell.addColorStop(0.7, "#48603a");
+        shell.addColorStop(1, "#38502c");
+        g.fillStyle = shell;
+        g.beginPath();
+        g.ellipse(0, 0, L * 0.48, W * 0.48, 0, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = "#2c4022";
+        g.lineWidth = 1.4;
+        g.stroke();
+        g.strokeStyle = "rgba(28,44,22,0.55)";
+        g.lineWidth = 1;
+        g.beginPath();
+        g.ellipse(0, 0, L * 0.4, W * 0.38, 0, 0, Math.PI * 2);
+        g.stroke();
+        g.fillStyle = "rgba(44,64,34,0.85)";
+        g.strokeStyle = "rgba(120,150,95,0.5)";
+        for (const [sx, r] of [[-0.22, 0.1], [0, 0.115], [0.22, 0.1]]) {
+          g.beginPath();
+          for (let k = 0; k < 6; k++) {
+            const a = k / 6 * Math.PI * 2 + Math.PI / 6;
+            const px = sx * L + Math.cos(a) * L * r, py = Math.sin(a) * L * r * 0.9;
+            if (k === 0) g.moveTo(px, py);
+            else g.lineTo(px, py);
+          }
+          g.closePath();
+          g.fill();
+          g.stroke();
+        }
+        g.fillStyle = "#6b7d52";
+        g.beginPath();
+        g.ellipse(L * 0.5, 0, L * 0.13, L * 0.1, 0, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#1d2416";
+        g.beginPath();
+        g.arc(L * 0.53, -W * 0.075, 1.6, 0, Math.PI * 2);
+        g.arc(L * 0.53, W * 0.075, 1.6, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      }
+    }
+    return { create: (type, opts) => new Turtle(type, opts), Turtle };
+  }
+
   // src/features/clock.js
   var lx3 = () => THEME.light.dir[0];
   var ly3 = () => THEME.light.dir[1];
@@ -5046,39 +5165,7 @@
       rainLP2.connect(rainGain);
       rainGain.connect(master);
       rainSrc.start();
-      const voices = [];
-      for (const [freq, pan] of [[4100, -0.55], [4500, 0.1], [3800, 0.6]]) {
-        const osc = ctx.createOscillator();
-        osc.type = "sine";
-        osc.frequency.value = freq;
-        const g = ctx.createGain();
-        g.gain.value = 0;
-        const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-        if (p) {
-          p.pan.value = pan;
-          osc.connect(g);
-          g.connect(p);
-          p.connect(master);
-        } else {
-          osc.connect(g);
-          g.connect(master);
-        }
-        osc.start();
-        voices.push({ gain: g, timer: 0.4 + rng() * 2 });
-      }
-      nodes = { waterGain, rainGain, voices, noise };
-    }
-    function chirp(v, vol) {
-      const t0 = ctx.currentTime + 0.05;
-      const g = v.gain.gain;
-      g.cancelScheduledValues(t0);
-      g.setValueAtTime(0, t0);
-      const pulses = 6 + Math.floor(rng() * 4);
-      for (let j = 0; j < pulses; j++) {
-        const p = t0 + j * 0.045;
-        g.linearRampToValueAtTime(vol, p + 8e-3);
-        g.linearRampToValueAtTime(1e-4, p + 0.032);
-      }
+      nodes = { waterGain, rainGain, noise };
     }
     function thunder() {
       const t0 = ctx.currentTime + 0.1, dur = 2.8;
@@ -5123,14 +5210,6 @@
         master.gain.setTargetAtTime(vol, t, 0.1);
         nodes.waterGain.gain.setTargetAtTime(0.045 * duck * (1 - rainAud * 0.4), t, 0.2);
         nodes.rainGain.gain.setTargetAtTime(rainAud * rainAud * 0.13 * rainBoost * duck, t, 0.25);
-        const cricketOn = night > 0.45 && rainAud < 0.5;
-        for (const v of nodes.voices) {
-          v.timer -= dt;
-          if (v.timer <= 0) {
-            if (cricketOn) chirp(v, (0.03 + rng() * 0.03) * night);
-            v.timer = cricketOn ? 0.9 + rng() * 1.8 : 1 + rng();
-          }
-        }
         thunderTimer -= dt;
         if (isStorm && thunderTimer <= 0) {
           thunder();
@@ -5171,8 +5250,7 @@
           rainAud,
           rainBoost,
           rainGainTarget: +(rainAud * rainAud * 0.13 * rainBoost).toFixed(3),
-          thunderIn: Math.round(thunderTimer),
-          voices: nodes ? nodes.voices.length : 0
+          thunderIn: Math.round(thunderTimer)
         };
       }
     };
@@ -5389,6 +5467,311 @@
     };
   }
 
+  // src/features/pond-life.js
+  function createPondLife({ viewport, config, spawnRipple }) {
+    const rng = mulberry32(53710);
+    const pick = (r) => r[0] + rng() * (r[1] - r[0]);
+    const rippleStrength = () => Number(config.rippleStrength) || 1;
+    const flies = [];
+    for (const [fx, fy] of [[0.32, 0.3], [0.68, 0.62]]) {
+      const f = {
+        ax: viewport.width * fx,
+        ay: viewport.height * fy,
+        // 锚点
+        x: viewport.width * fx,
+        y: viewport.height * fy,
+        ang: rng() * Math.PI * 2,
+        ph1: rng() * 6.28,
+        ph2: rng() * 6.28,
+        wing: rng() * 6.28,
+        hoverT: 0,
+        mode: "hover",
+        t: 0,
+        dur: 0,
+        fx0: 0,
+        fy0: 0,
+        fx1: 0,
+        fy1: 0,
+        dipT: 0,
+        dipping: 0,
+        dipped: false
+      };
+      enterHover(f);
+      flies.push(f);
+    }
+    function newAnchor(f) {
+      f.fx0 = f.ax;
+      f.fy0 = f.ay;
+      f.fx1 = viewport.width * (0.2 + rng() * 0.6);
+      f.fy1 = viewport.height * (0.2 + rng() * 0.6);
+      f.mode = "dart";
+      f.t = 0;
+      f.dur = Math.hypot(f.fx1 - f.fx0, f.fy1 - f.fy0) / pick([420, 700]);
+    }
+    function enterHover(f) {
+      f.mode = "hover";
+      f.hoverT = pick([4, 9]);
+      f.dipT = 1.5 + rng() * Math.max(0.3, f.hoverT - 2.5);
+      f.dipped = false;
+    }
+    function stepFlies(dt) {
+      for (const f of flies) {
+        f.wing += dt * 42;
+        f.ph1 += dt * 1.7;
+        f.ph2 += dt * 1.13;
+        if (f.mode === "hover") {
+          f.x = f.ax + Math.sin(f.ph1) * 9 + Math.sin(f.ph2 * 0.7) * 5;
+          f.y = f.ay + Math.cos(f.ph2) * 8 + Math.sin(f.ph1 * 0.6) * 5;
+          f.ang = Math.sin(f.ph2 * 0.5) * 0.6;
+          f.hoverT -= dt;
+          f.dipT -= dt;
+          if (f.dipT <= 0 && f.hoverT > 1) {
+            f.mode = "dip";
+            f.t = 0;
+            f.dur = 0.55;
+            f.dipping = 0;
+            f.dipped = false;
+          } else if (f.hoverT <= 0) {
+            newAnchor(f);
+          }
+        } else if (f.mode === "dart") {
+          f.t += dt;
+          const p = Math.min(1, f.t / f.dur);
+          f.x = f.fx0 + (f.fx1 - f.fx0) * p;
+          f.y = f.fy0 + (f.fy1 - f.fy0) * p;
+          f.ang = Math.atan2(f.fy1 - f.fy0, f.fx1 - f.fx0);
+          if (p >= 1) {
+            f.ax = f.fx1;
+            f.ay = f.fy1;
+            enterHover(f);
+          }
+        } else {
+          f.t += dt;
+          f.dipping = Math.sin(Math.PI * Math.min(1, f.t / f.dur));
+          if (f.dipping > 0.9 && !f.dipped) {
+            f.dipped = true;
+            spawnRipple(f.x, f.y, 0.5 * rippleStrength());
+          }
+          if (f.t >= f.dur) {
+            f.mode = "hover";
+            f.dipping = 0;
+            f.dipped = false;
+            f.dipT = 1e9;
+          }
+        }
+      }
+    }
+    const leaves = [];
+    for (const [fx, fy, r] of [[0.13, 0.72, 34], [0.88, 0.26, 30], [0.46, 0.1, 28]]) {
+      leaves.push({
+        x: viewport.width * fx,
+        y: viewport.height * fy,
+        r,
+        notch: rng() * Math.PI * 2,
+        ph: rng() * 6.28
+      });
+    }
+    const frog = {
+      leaf: 0,
+      x: leaves[0].x,
+      y: leaves[0].y,
+      hopT: pick([10, 24]),
+      jump: null,
+      // { from, to, t, dur }
+      croakT: pick([5, 14]),
+      croaking: 0
+    };
+    function stepFrog(dt) {
+      for (const l2 of leaves) l2.ph += dt * 0.6;
+      if (frog.jump) {
+        const j = frog.jump;
+        j.t += dt;
+        const p = Math.min(1, j.t / j.dur);
+        frog.x = j.x0 + (j.x1 - j.x0) * p;
+        frog.y = j.y0 + (j.y1 - j.y0) * p;
+        frog.air = Math.sin(Math.PI * p);
+        if (p >= 1) {
+          frog.jump = null;
+          frog.air = 0;
+          frog.leaf = j.to;
+          spawnRipple(frog.x, frog.y, 0.9 * rippleStrength());
+          frog.hopT = pick([25, 60]);
+          frog.croakT = pick([3, 8]);
+        }
+        return;
+      }
+      const l = leaves[frog.leaf];
+      frog.x = l.x + Math.sin(l.ph) * 2;
+      frog.y = l.y + Math.cos(l.ph * 0.8) * 2;
+      frog.hopT -= dt;
+      if (frog.hopT <= 0) {
+        const to = (frog.leaf + 1 + Math.floor(rng() * (leaves.length - 1))) % leaves.length;
+        spawnRipple(frog.x, frog.y, 0.4 * rippleStrength());
+        frog.jump = { x0: frog.x, y0: frog.y, x1: leaves[to].x, y1: leaves[to].y, to, t: 0, dur: 0.65 };
+        frog.air = 0;
+        return;
+      }
+      frog.croakT -= dt;
+      if (frog.croakT <= 0) {
+        frog.croaking = 1;
+        frog.croakT = pick([6, 16]);
+      }
+      if (frog.croaking > 0) frog.croaking = Math.max(0, frog.croaking - dt * 2.2);
+    }
+    return {
+      update(dt) {
+        stepFlies(dt);
+        stepFrog(dt);
+      },
+      layers: {
+        weather: (g) => {
+          drawLeaves(g, leaves);
+          drawFrog(g, frog);
+          for (const f of flies) drawDragonfly(g, f);
+        }
+      },
+      clear() {
+      },
+      inspect: () => ({
+        flies: flies.map((f) => ({ mode: f.mode, x: Math.round(f.x), y: Math.round(f.y) })),
+        frog: { leaf: frog.leaf, jumping: !!frog.jump, croaking: frog.croaking > 0 }
+      })
+    };
+    function drawLeaves(g, ls) {
+      for (const l of ls) {
+        g.save();
+        g.translate(l.x, l.y + Math.sin(l.ph) * 1.5);
+        g.fillStyle = "rgba(10,30,28,0.14)";
+        g.beginPath();
+        g.ellipse(3, 4, l.r * 1.02, l.r * 0.96, 0, 0, Math.PI * 2);
+        g.fill();
+        const gr = g.createRadialGradient(0, 0, l.r * 0.1, 0, 0, l.r);
+        gr.addColorStop(0, "#3f7038");
+        gr.addColorStop(0.75, "#356230");
+        gr.addColorStop(1, "#2a5226");
+        g.fillStyle = gr;
+        g.beginPath();
+        g.arc(0, 0, l.r, 0, Math.PI * 2);
+        g.fill();
+        g.globalCompositeOperation = "destination-out";
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.arc(0, 0, l.r + 1, l.notch, l.notch + 0.42);
+        g.closePath();
+        g.fill();
+        g.globalCompositeOperation = "source-over";
+        g.strokeStyle = "rgba(190,220,170,0.25)";
+        g.lineWidth = 1;
+        for (let k = 0; k < 6; k++) {
+          const a = l.notch + 0.5 + k / 6 * (Math.PI * 2 - 0.6);
+          g.beginPath();
+          g.moveTo(0, 0);
+          g.lineTo(Math.cos(a) * l.r * 0.92, Math.sin(a) * l.r * 0.92);
+          g.stroke();
+        }
+        g.strokeStyle = "rgba(200,230,180,0.3)";
+        g.beginPath();
+        g.arc(0, 0, l.r, 0, Math.PI * 2);
+        g.stroke();
+        g.restore();
+      }
+    }
+    function drawFrog(g, f) {
+      const onLeaf = !f.jump;
+      g.save();
+      g.translate(f.x, f.y - (f.air || 0) * 22);
+      g.rotate(onLeaf ? Math.sin(leaves[f.leaf].ph) * 0.05 : Math.atan2(f.jump.y1 - f.jump.y0, f.jump.x1 - f.jump.x0) - Math.PI / 2);
+      const sc = 1 + (f.air || 0) * 0.28;
+      g.scale(sc, sc);
+      const shadowAlpha = onLeaf ? 0.2 : 0.2 * (1 - (f.air || 0));
+      g.fillStyle = "rgba(10,30,28," + shadowAlpha + ")";
+      g.beginPath();
+      g.ellipse(2, 3 + (f.air || 0) * 20, 13, 9, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#4d7a33";
+      for (const sgn of [-1, 1]) {
+        g.beginPath();
+        g.ellipse(sgn * 10, 7, 6.5, 4, sgn * 0.7, 0, Math.PI * 2);
+        g.fill();
+      }
+      const body = g.createRadialGradient(-2, -4, 2, 0, 0, 15);
+      body.addColorStop(0, "#6d9a48");
+      body.addColorStop(1, "#48702f");
+      g.fillStyle = body;
+      g.beginPath();
+      g.ellipse(0, 0, 12, 9.5, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "rgba(46,74,30,0.7)";
+      g.beginPath();
+      g.ellipse(-3, -1, 4.5, 2.6, 0.4, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.ellipse(4, 2, 3, 1.8, -0.5, 0, Math.PI * 2);
+      g.fill();
+      if (f.croaking > 0) {
+        const c = Math.sin(Math.min(1, f.croaking) * Math.PI);
+        g.fillStyle = "rgba(214,232,168," + (0.75 * c).toFixed(2) + ")";
+        g.beginPath();
+        g.ellipse(0, -9, 4.5 * c + 1, 3.5 * c + 1, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      for (const sgn of [-1, 1]) {
+        g.fillStyle = "#cfe3a8";
+        g.beginPath();
+        g.arc(sgn * 5.5, -7.5, 3.4, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#1d2416";
+        g.beginPath();
+        g.arc(sgn * 5.5, -8, 1.7, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.fillStyle = "#4d7a33";
+      for (const sgn of [-1, 1]) {
+        g.beginPath();
+        g.ellipse(sgn * 7, -4, 3, 2, sgn * 0.5, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.restore();
+    }
+    function drawDragonfly(g, f) {
+      const dip = f.dipping || 0;
+      g.save();
+      g.translate(f.x, f.y + dip * 4);
+      g.rotate(f.ang + Math.PI / 2);
+      const s = 1 - dip * 0.12;
+      g.scale(s, s);
+      g.fillStyle = "rgba(225,240,250,0.34)";
+      for (const sgn of [-1, 1]) {
+        for (const [front, wl] of [[1, 15], [-1, 13]]) {
+          g.save();
+          g.translate(front * 3.5, sgn * 3.2);
+          g.rotate(sgn * (0.85 + Math.sin(f.wing + front * 2) * 0.18));
+          g.beginPath();
+          g.ellipse(0, -wl * 0.45, 2.6, wl * 0.55, 0, 0, Math.PI * 2);
+          g.fill();
+          g.restore();
+        }
+      }
+      g.strokeStyle = "#3f7fae";
+      g.lineWidth = 2.2;
+      g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(0, 2);
+      g.lineTo(0, 13);
+      g.stroke();
+      g.fillStyle = "#2f628c";
+      g.beginPath();
+      g.ellipse(0, 0, 3.4, 4.4, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#24507a";
+      g.beginPath();
+      g.arc(-2.2, -4.2, 2.4, 0, Math.PI * 2);
+      g.arc(2.2, -4.2, 2.4, 0, Math.PI * 2);
+      g.fill();
+      g.restore();
+    }
+  }
+
   // src/builtins.js
   function registerBuiltins({ creatures, features, context }) {
     const koiKind = createKoiCreature({
@@ -5403,6 +5786,22 @@
       drawFish: context.drawFish
     });
     creatures.register({ id: "koi-fish", title: "\u9526\u9CA4", create: koiKind.create, exports: koiKind });
+    context.types.register({
+      id: "turtle",
+      name: "\u4E4C\u9F9F",
+      creature: "turtle",
+      segmentSpacing: 1,
+      speedMultiplier: 0.15,
+      turnRadius: 3,
+      collisionRadius: 0.1
+    });
+    const turtleKind = createTurtleCreature({ viewport: context.viewport });
+    creatures.register({ id: "turtle", title: "\u4E4C\u9F9F", create: turtleKind.create, exports: turtleKind });
+    for (let i = 0; i < 2; i++) {
+      const t = creatures.spawn("turtle", { origin: "spawned" });
+      t.origin = "spawned";
+      context.kois.push(t);
+    }
     features.register({ id: "clock", title: "\u65F6\u949F", create: () => {
       const clock = createClock({ viewport: context.viewport });
       let on = true;
@@ -5486,6 +5885,11 @@
       config: context.config,
       viewport: context.viewport,
       environment: context.environment,
+      spawnRipple: context.spawnRipple
+    }) });
+    features.register({ id: "pondLife", title: "\u6C60\u5858\u5C0F\u4F4F\u6237", create: () => createPondLife({
+      config: context.config,
+      viewport: context.viewport,
       spawnRipple: context.spawnRipple
     }) });
     features.register({ id: "overlay", title: "\u8986\u76D6\u5C42", create: () => {
