@@ -159,18 +159,9 @@ function contact(A, B) {
                 const overlap = ra + cb.r - dMin;
                 if (overlap <= 0) continue;
                 const corr = overlap * relax;
-                // 按体量分摊:大鱼少动、小鱼多让。
-                // ★ collision.mass 语义(2026-10-03 修):带 mass 的生物(乌龟)是
-                //   【不动礁石】—— 鱼被完全推开、它零位移。否则 80 条鱼每帧从四面
-                //   推它哪怕 4%,叠加起来也让它抖成抽搐(实测两轮:质量加权只把
-                //   方向一致性从 0.2 提到 0.35,零位移才彻底解决)。
-                //   两只带 mass 的生物相遇:各让一半(谁也不吃亏)。
-                const mA = (ca && ca.mass) || A.sizeMul, mB = (cb && cb.mass) || B.sizeMul;
-                let wA, wB;
-                if (ca.mass && cb.mass) { wA = 0.5; wB = 0.5; }
-                else if (ca.mass) { wA = 0; wB = 1; }
-                else if (cb.mass) { wA = 1; wB = 0; }
-                else { wA = mB / (mA + mB); wB = mA / (mA + mB); }
+                // 按体量分摊:大鱼少动、小鱼多让
+                const mA = A.sizeMul, mB = B.sizeMul, ms = mA + mB;
+                const wA = mB / ms, wB = mA / ms;
 
                 A.translate( nx * corr * wA,  ny * corr * wA);
                 B.translate(-nx * corr * wB, -ny * corr * wB);
